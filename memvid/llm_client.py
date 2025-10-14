@@ -30,6 +30,12 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
     print("Warning: Anthropic library not available. Anthropic provider will be disabled.")
 
+try: 
+    from together import Together
+    TOGETHER_AVAILABLE = True
+except ImportError:
+    TOGETHER_AVAILABLE = False
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers"""
 
@@ -300,6 +306,42 @@ class AnthropicProvider(LLMProvider):
             elif chunk.type == "message_stop":
                 break
 
+class TogetherAIProvider(LLMProvider):
+    """TogetherAI provider implementation"""
+
+    def __init__(self, api_key: str, model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"):
+        self.client = Together(api_key=api_key)
+        self.model = model
+
+    def chat(self, messages: List[Dict[str, str]], stream: bool = False, **kwargs) -> Any:
+        """Send chat messages to TogetherAI"""
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=stream,
+                **kwargs
+            )
+
+            if stream:
+                return self._stream_response(response)
+            else:
+                return response.choices[0].message.content
+
+        except Exception as e:
+            print(f"Together error: {e}")
+            return None
+
+    def chat_stream(self, messages: List[Dict[str, str]], **kwargs) -> Iterator[str]:
+        """Stream chat response from TogetherAI"""
+        return self.chat(messages, stream=True, **kwargs)
+
+    def _stream_response(self, response) -> Iterator[str]:
+        """Process streaming response from TogetherAI"""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+
 class LLMClient:
     """Unified LLM client that supports multiple providers"""
 
@@ -307,6 +349,7 @@ class LLMClient:
         'openai': OpenAIProvider,
         'google': GoogleProvider,
         'anthropic': AnthropicProvider,
+        'together': TogetherAIProvider
     }
 
     def __init__(self, provider: str = 'google', model: str = None, api_key: str = None):
@@ -319,7 +362,8 @@ class LLMClient:
         availability_map = {
             'openai': OPENAI_AVAILABLE,
             'google': GOOGLE_AVAILABLE,
-            'anthropic': ANTHROPIC_AVAILABLE
+            'anthropic': ANTHROPIC_AVAILABLE,
+            'together': TOGETHER_AVAILABLE
         }
 
         if not availability_map[self.provider_name]:
@@ -349,6 +393,7 @@ class LLMClient:
             'openai': ['OPENAI_API_KEY'],
             'google': ['GOOGLE_API_KEY'],
             'anthropic': ['ANTHROPIC_API_KEY'],
+            'together': ['TOGETHER_API_KEY']
         }
 
         for key in env_keys.get(provider.lower(), []):
@@ -391,7 +436,8 @@ class LLMClient:
         availability_map = {
             'openai': OPENAI_AVAILABLE,
             'google': GOOGLE_AVAILABLE,
-            'anthropic': ANTHROPIC_AVAILABLE
+            'anthropic': ANTHROPIC_AVAILABLE,
+            'together': TOGETHER_AVAILABLE
         }
         return [provider for provider, available in availability_map.items() if available]
 
