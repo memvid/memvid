@@ -4,7 +4,7 @@ opencv-contrib-python==4.11.0.86
 sentence-transformers==4.1.0
 numpy==1.26.4
 tqdm==4.67.1
-faiss-cpu==1.7.4
+faiss-cpu==1.11.0
 Pillow==11.2.1
 
 # Optional dependencies for PDF support
