@@ -48,7 +48,7 @@ setup(
         ],
         "llm": [
             "openai>=1.0.0",
-            "google-generativeai>=0.8.0",
+            "google-genai>=1.39.1",
             "anthropic>=0.52.0",
         ],
         "epub": [

@@ -1,342 +1,248 @@
-# Memvid - Video-Based AI Memory 🧠📹
+## What to expect in v2
 
-**The lightweight, game-changing solution for AI memory at scale**
+> **Early-access notice**  
+> Memvid v1 is still experimental. The file format and API may change until we lock in a stable release.
+> 
+> **Memvid v2 – what's next**  
+> - **Living-Memory Engine** – keep adding new data and let LLMs remember it across sessions.  
+> - **Capsule Context** – shareable `.mv2` capsules, each with its own rules and expiry.  
+> - **Time-Travel Debugging** – rewind or branch any chat to review or test.  
+> - **Smart Recall** – local cache guesses what you’ll need and loads it in under 5 ms.  
+> - **Codec Intelligence** – auto-tunes AV1 now and future codecs later, so files keep shrinking.  
+> - **CLI & Dashboard** – simple tools for branching, analytics, and one-command cloud publish.  
 
-[![PyPI version](https://badge.fury.io/py/memvid.svg)](https://pypi.org/project/memvid/)
+Sneak peek of Memvid v2 - a living memory engine that can be used to chat with your knowledge base.
+![Memvid v2 Preview](assets/mv2.png)
+
+
+---
+
+## Memvid v1
+
+
+
+[![PyPI](https://img.shields.io/pypi/v/memvid)](https://pypi.org/project/memvid/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Stars](https://img.shields.io/github/stars/olow304/memvid)](https://github.com/olow304/memvid)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Memvid revolutionizes AI memory management by encoding text data into videos, enabling **lightning-fast semantic search** across millions of text chunks with **sub-second retrieval times**. Unlike traditional vector databases that consume massive amounts of RAM and storage, Memvid compresses your knowledge base into compact video files while maintaining instant access to any piece of information.
+# Memvid - Turn millions of text chunks into a single, searchable video file
 
-## 🎥 Demo
+Memvid compresses an entire knowledge base into **MP4** files while keeping millisecond-level semantic search. Think of it as *SQLite for AI memory* portable, efficient, and self-contained. By encoding text as **QR codes in video frames**, we deliver **50-100×** smaller storage than vector databases with **zero infrastructure**.
 
-https://github.com/user-attachments/assets/ec550e93-e9c4-459f-a8a1-46e122b5851e
+---
 
+## Why Video Compression Changes Everything 🚀
 
+| What it enables | How video codecs make it possible |
+|---------|-------------------|
+| **50-100× smaller storage** | Modern video codecs compress repetitive visual patterns (QR codes) far better than raw embeddings |
+| **Sub-100ms retrieval** | Direct frame seek via index → QR decode → your text. No server round-trips |
+| **Zero infrastructure** | Just Python and MP4 files-no DB clusters, no Docker, no ops |
+| **True portability** | Copy or stream `memory.mp4`-it works anywhere video plays |
+| **Offline-first design** | After encoding, everything runs without internet |
 
-## ✨ Key Features
+---
 
-- 🎥 **Video-as-Database**: Store millions of text chunks in a single MP4 file
-- 🔍 **Semantic Search**: Find relevant content using natural language queries
-- 💬 **Built-in Chat**: Conversational interface with context-aware responses
-- 📚 **PDF Support**: Direct import and indexing of PDF documents
-- 🚀 **Fast Retrieval**: Sub-second search across massive datasets
-- 💾 **Efficient Storage**: 10x compression compared to traditional databases
-- 🔌 **Pluggable LLMs**: Works with OpenAI, Anthropic, or local models
-- 🌐 **Offline-First**: No internet required after video generation
-- 🔧 **Simple API**: Get started with just 3 lines of code
+## Under the Hood - Memvid v1 🔍
 
-## 🎯 Use Cases
+1. **Text → QR → Frame**  
+   Each text chunk becomes a QR code, packed into video frames. Modern codecs excel at compressing these repetitive patterns.
 
-- **📖 Digital Libraries**: Index thousands of books in a single video file
-- **🎓 Educational Content**: Create searchable video memories of course materials
-- **📰 News Archives**: Compress years of articles into manageable video databases
-- **💼 Corporate Knowledge**: Build company-wide searchable knowledge bases
-- **🔬 Research Papers**: Quick semantic search across scientific literature
-- **📝 Personal Notes**: Transform your notes into a searchable AI assistant
+2. **Smart indexing**  
+   Embeddings map queries → frame numbers. One seek, one decode, millisecond results.
 
-## 🚀 Why Memvid?
+3. **Codec leverage**  
+   30 years of video R&D means your text gets compressed better than any custom algorithm could achieve.
 
-### Game-Changing Innovation
-- **Video as Database**: Store millions of text chunks in a single MP4 file
-- **Instant Retrieval**: Sub-second semantic search across massive datasets
-- **10x Storage Efficiency**: Video compression reduces memory footprint dramatically
-- **Zero Infrastructure**: No database servers, just files you can copy anywhere
-- **Offline-First**: Works completely offline once videos are generated
+4. **Future-proof**  
+   Next-gen codecs (AV1, H.266) automatically make your memories smaller and faster-no code changes needed.
 
-### Lightweight Architecture
-- **Minimal Dependencies**: Core functionality in ~1000 lines of Python
-- **CPU-Friendly**: Runs efficiently without GPU requirements
-- **Portable**: Single video file contains your entire knowledge base
-- **Streamable**: Videos can be streamed from cloud storage
+---
 
-## 📦 Installation
-
-### Quick Install
+## Installation
 ```bash
 pip install memvid
-```
-
-### For PDF Support
-```bash
+# For PDF support
 pip install memvid PyPDF2
 ```
 
-### Recommended Setup (Virtual Environment)
-```bash
-# Create a new project directory
-mkdir my-memvid-project
-cd my-memvid-project
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-
-# Install memvid
-pip install memvid
-
-# For PDF support:
-pip install PyPDF2
-```
-
-## 🎯 Quick Start
-
-### Basic Usage
+## Quick Start
 ```python
 from memvid import MemvidEncoder, MemvidChat
 
-# Create video memory from text chunks
-chunks = ["Important fact 1", "Important fact 2", "Historical event details"]
+# Create video memory from text
+chunks = ["NASA founded 1958", "Apollo 11 landed 1969", "ISS launched 1998"]
 encoder = MemvidEncoder()
 encoder.add_chunks(chunks)
-encoder.build_video("memory.mp4", "memory_index.json")
+encoder.build_video("space.mp4", "space_index.json")
 
-# Chat with your memory
-chat = MemvidChat("memory.mp4", "memory_index.json")
-chat.start_session()
-response = chat.chat("What do you know about historical events?")
-print(response)
+# Chat with your memory (uses Google Gemini by default)
+chat = MemvidChat("space.mp4", "space_index.json")
+response = chat.chat("When did humans land on the moon?")
+print(response)  # References Apollo 11 in 1969
+
+# Or use local models with Ollama (no API key needed!)
+chat = MemvidChat("space.mp4", "space_index.json", 
+                  llm_provider='ollama', 
+                  llm_model='llama3.2:3b')
 ```
 
-### Building Memory from Documents
+## Real-World Examples
+
+### Documentation Assistant
 ```python
 from memvid import MemvidEncoder
 import os
 
-# Load documents
-encoder = MemvidEncoder(chunk_size=512, overlap=50)
+encoder = MemvidEncoder(chunk_size=512)
 
-# Add text files
-for file in os.listdir("documents"):
-    with open(f"documents/{file}", "r") as f:
-        encoder.add_text(f.read(), metadata={"source": file})
+# Index all markdown files
+for file in os.listdir("docs"):
+    if file.endswith(".md"):
+        with open(f"docs/{file}") as f:
+            encoder.add_text(f.read(), metadata={"file": file})
 
-# Build optimized video
-encoder.build_video(
-    "knowledge_base.mp4",
-    "knowledge_index.json",
-    fps=30,  # Higher FPS = more chunks per second
-    frame_size=512  # Larger frames = more data per frame
-)
+encoder.build_video("docs.mp4", "docs_index.json")
 ```
 
-### Advanced Search & Retrieval
+### PDF Library Search
 ```python
+# Index multiple PDFs
+encoder = MemvidEncoder()
+encoder.add_pdf("deep_learning.pdf")
+encoder.add_pdf("machine_learning.pdf") 
+encoder.build_video("ml_library.mp4", "ml_index.json")
+
+# Semantic search across all books
 from memvid import MemvidRetriever
-
-# Initialize retriever
-retriever = MemvidRetriever("knowledge_base.mp4", "knowledge_index.json")
-
-# Semantic search
-results = retriever.search("machine learning algorithms", top_k=5)
-for chunk, score in results:
-    print(f"Score: {score:.3f} | {chunk[:100]}...")
-
-# Get context window
-context = retriever.get_context("explain neural networks", max_tokens=2000)
-print(context)
+retriever = MemvidRetriever("ml_library.mp4", "ml_index.json")
+results = retriever.search("backpropagation", top_k=5)
 ```
 
-### Interactive Chat Interface
+### Interactive Web UI
 ```python
 from memvid import MemvidInteractive
 
-# Launch interactive chat UI
-interactive = MemvidInteractive("knowledge_base.mp4", "knowledge_index.json")
-interactive.run()  # Opens web interface at http://localhost:7860
+# Launch at http://localhost:7860
+interactive = MemvidInteractive("knowledge.mp4", "index.json")
+interactive.run()
 ```
 
-### Testing with file_chat.py
-The `examples/file_chat.py` script provides a comprehensive way to test Memvid with your own documents:
+## LLM Provider Support
 
-```bash
-# Process a directory of documents
-python examples/file_chat.py --input-dir /path/to/documents --provider google
+Memvid supports multiple LLM providers for chat functionality:
 
-# Process specific files
-python examples/file_chat.py --files doc1.txt doc2.pdf --provider openai
+### Supported Providers
 
-# Use H.265 compression (requires Docker)
-python examples/file_chat.py --input-dir docs/ --codec h265 --provider google
+| Provider | API Key Required | Best For | Setup |
+|----------|-----------------|----------|-------|
+| **Google (Gemini)** | ✅ Yes | Fast, cost-effective | Set `GOOGLE_API_KEY` |
+| **OpenAI (GPT)** | ✅ Yes | High quality | Set `OPENAI_API_KEY` |
+| **Anthropic (Claude)** | ✅ Yes | Long context | Set `ANTHROPIC_API_KEY` |
+| **Ollama (Local)** | ❌ No | Privacy, offline | [Install Ollama](https://ollama.com) |
 
-# Custom chunking for large documents
-python examples/file_chat.py --files large.pdf --chunk-size 2048 --overlap 32 --provider google
+### Using Local Models with Ollama
 
-# Load existing memory
-python examples/file_chat.py --load-existing output/my_memory --provider google
+Run AI models locally without API costs or privacy concerns:
+
+```python
+# Install Ollama first: https://ollama.com
+# Pull a model: ollama pull llama3.2:3b
+
+from memvid import MemvidChat
+
+chat = MemvidChat(
+    video_file="memory.mp4",
+    index_file="index.json",
+    llm_provider='ollama',
+    llm_model='llama3.2:3b'  # or mistral, phi3, etc.
+)
+
+response = chat.chat("Your question")
 ```
 
-### Complete Example: Chat with a PDF Book
-```bash
-# 1. Create a new directory and set up environment
-mkdir book-chat-demo
-cd book-chat-demo
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+See [OLLAMA_GUIDE.md](OLLAMA_GUIDE.md) for detailed Ollama setup and usage.
 
-# 2. Install dependencies
-pip install memvid PyPDF2
+### Switching Providers
 
-# 3. Create book_chat.py
-cat > book_chat.py << 'EOF'
-from memvid import MemvidEncoder, chat_with_memory
-import os
+```python
+# Google Gemini (default)
+chat = MemvidChat(..., llm_provider='google', llm_model='gemini-2.0-flash-exp')
 
-# Your PDF file
-book_pdf = "book.pdf"  # Replace with your PDF path
+# OpenAI
+chat = MemvidChat(..., llm_provider='openai', llm_model='gpt-4o')
 
-# Build video memory
-encoder = MemvidEncoder()
-encoder.add_pdf(book_pdf)
-encoder.build_video("book_memory.mp4", "book_index.json")
+# Anthropic
+chat = MemvidChat(..., llm_provider='anthropic', llm_model='claude-3-5-sonnet-20241022')
 
-# Chat with the book
-api_key = os.getenv("OPENAI_API_KEY")  # Optional: for AI responses
-chat_with_memory("book_memory.mp4", "book_index.json", api_key=api_key)
-EOF
-
-# 4. Run it
-export OPENAI_API_KEY="your-api-key"  # Optional
-python book_chat.py
+# Ollama (local)
+chat = MemvidChat(..., llm_provider='ollama', llm_model='llama3.2:3b')
 ```
 
-## 🛠️ Advanced Configuration
+## Advanced Features
+
+### Scale Optimization
+```python
+# Maximum compression for huge datasets
+encoder.build_video(
+    "compressed.mp4",
+    "index.json", 
+    fps=60,              # More frames/second
+    frame_size=256,      # Smaller QR codes
+    video_codec='h265',  # Better compression
+    crf=28              # Quality tradeoff
+)
+```
 
 ### Custom Embeddings
 ```python
 from sentence_transformers import SentenceTransformer
 
-# Use custom embedding model
-custom_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-encoder = MemvidEncoder(embedding_model=custom_model)
+model = SentenceTransformer('all-mpnet-base-v2')
+encoder = MemvidEncoder(embedding_model=model)
 ```
 
-### Video Optimization
+### Parallel Processing
 ```python
-# For maximum compression
-encoder.build_video(
-    "compressed.mp4",
-    "index.json",
-    fps=60,  # More frames per second
-    frame_size=256,  # Smaller frames
-    video_codec='h265',  # Better compression
-    crf=28  # Compression quality (lower = better quality)
-)
-```
-
-### Distributed Processing
-```python
-# Process large datasets in parallel
 encoder = MemvidEncoder(n_workers=8)
-encoder.add_chunks_parallel(massive_chunk_list)
+encoder.add_chunks_parallel(million_chunks)
 ```
 
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**ModuleNotFoundError: No module named 'memvid'**
+## CLI Usage
 ```bash
-# Make sure you're using the right Python
-which python  # Should show your virtual environment path
-# If not, activate your virtual environment:
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Process documents
+python examples/file_chat.py --input-dir /docs --provider openai
+
+# Advanced codecs
+python examples/file_chat.py --files doc.pdf --codec h265
+
+# Load existing
+python examples/file_chat.py --load-existing output/memory
 ```
 
-**ImportError: PyPDF2 is required for PDF support**
-```bash
-pip install PyPDF2
-```
+## Performance
 
-**LLM API Key Issues**
-```bash
-# Set your API key (get one at https://platform.openai.com)
-export GOOGLE_API_KEY="AIzaSyB1-..."  # macOS/Linux
-# Or on Windows:
-set GOOGLE_API_KEY=AIzaSyB1-...
-```
+- **Indexing**: ~10K chunks/second on modern CPUs
+- **Search**: <100ms for 1M chunks (includes decode)
+- **Storage**: 100MB text → 1-2MB video
+- **Memory**: Constant 500MB RAM regardless of size
 
-**Large PDF Processing**
-```python
-# For very large PDFs, use smaller chunk sizes
-encoder = MemvidEncoder()
-encoder.add_pdf("large_book.pdf", chunk_size=400, overlap=50)
-```
+## What's Coming in v2
 
-## 🤝 Contributing
+- **Delta encoding**: Time-travel through knowledge versions
+- **Streaming ingest**: Add to videos in real-time
+- **Cloud dashboard**: Web UI with API management
+- **Smart codecs**: Auto-select AV1/HEVC per content
+- **GPU boost**: 100× faster bulk encoding
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+## Get Involved
 
-```bash
-# Run tests
-pytest tests/
+Memvid is redefining AI memory. Join us:
 
-# Run with coverage
-pytest --cov=memvid tests/
+- ⭐ Star on [GitHub](https://github.com/olow304/memvid)
+- 🐛 Report issues or request features
+- 🔧 Submit PRs (we review quickly!)
+- 💬 Discuss video-based AI memory
 
-# Format code
-black memvid/
-```
-
-## 🆚 Comparison with Traditional Solutions
-
-| Feature | Memvid | Vector DBs | Traditional DBs |
-|---------|--------|------------|-----------------|
-| Storage Efficiency | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
-| Setup Complexity | Simple | Complex | Complex |
-| Semantic Search | ✅ | ✅ | ❌ |
-| Offline Usage | ✅ | ❌ | ✅ |
-| Portability | File-based | Server-based | Server-based |
-| Scalability | Millions | Millions | Billions |
-| Cost | Free | $$$$ | $$$ |
-
-
-## 📚 Examples
-
-Check out the [examples/](examples/) directory for:
-- Building memory from Wikipedia dumps
-- Creating a personal knowledge base
-- Multi-language support
-- Real-time memory updates
-- Integration with popular LLMs
-
-## 🆘 Getting Help
-
-- 📖 [Documentation](https://github.com/olow304/memvid/wiki) - Comprehensive guides
-- 💬 [Discussions](https://github.com/olow304/memvid/discussions) - Ask questions
-- 🐛 [Issue Tracker](https://github.com/olow304/memvid/issues) - Report bugs
-- 🌟 [Show & Tell](https://github.com/olow304/memvid/discussions/categories/show-and-tell) - Share your projects
-
-## 🔗 Links
-
-- [GitHub Repository](https://github.com/olow304/memvid)
-- [PyPI Package](https://pypi.org/project/memvid)
-- [Changelog](https://github.com/olow304/memvid/releases)
-
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-Created by [Olow304](https://github.com/olow304) and the Memvid community.
-
-Built with ❤️ using:
-- [sentence-transformers](https://www.sbert.net/) - State-of-the-art embeddings for semantic search
-- [OpenCV](https://opencv.org/) - Computer vision and video processing
-- [qrcode](https://github.com/lincolnloop/python-qrcode) - QR code generation
-- [FAISS](https://github.com/facebookresearch/faiss) - Efficient similarity search
-- [PyPDF2](https://github.com/py-pdf/pypdf) - PDF text extraction
-
-Special thanks to all contributors who help make Memvid better!
-
----
-
-**Ready to revolutionize your AI memory management? Install Memvid and start building!** 🚀

@@ -78,11 +78,12 @@ INDEX_TYPE = "Flat"  # Can be "IVF" for larger datasets, otherwise use Flat
 NLIST = 100  # Number of clusters for IVF index
 
 # LLM settings
-DEFAULT_LLM_PROVIDER = "google"  # google, openai, anthropic
+DEFAULT_LLM_PROVIDER = "google"  # google, openai, anthropic, ollama
 DEFAULT_LLM_MODELS = {
     "google": "gemini-2.0-flash-exp",
     "openai": "gpt-4o",
-    "anthropic": "claude-3-5-sonnet-20241022"
+    "anthropic": "claude-3-5-sonnet-20241022",
+    "ollama": "llama3.2:3b"  # Local model, requires Ollama installation
 }
 
 MAX_TOKENS = 8192
