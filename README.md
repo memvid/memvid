@@ -78,10 +78,15 @@ encoder = MemvidEncoder()
 encoder.add_chunks(chunks)
 encoder.build_video("space.mp4", "space_index.json")
 
-# Chat with your memory
+# Chat with your memory (uses Google Gemini by default)
 chat = MemvidChat("space.mp4", "space_index.json")
 response = chat.chat("When did humans land on the moon?")
 print(response)  # References Apollo 11 in 1969
+
+# Or use local models with Ollama (no API key needed!)
+chat = MemvidChat("space.mp4", "space_index.json", 
+                  llm_provider='ollama', 
+                  llm_model='llama3.2:3b')
 ```
 
 ## Real-World Examples
@@ -123,6 +128,57 @@ from memvid import MemvidInteractive
 # Launch at http://localhost:7860
 interactive = MemvidInteractive("knowledge.mp4", "index.json")
 interactive.run()
+```
+
+## LLM Provider Support
+
+Memvid supports multiple LLM providers for chat functionality:
+
+### Supported Providers
+
+| Provider | API Key Required | Best For | Setup |
+|----------|-----------------|----------|-------|
+| **Google (Gemini)** | ✅ Yes | Fast, cost-effective | Set `GOOGLE_API_KEY` |
+| **OpenAI (GPT)** | ✅ Yes | High quality | Set `OPENAI_API_KEY` |
+| **Anthropic (Claude)** | ✅ Yes | Long context | Set `ANTHROPIC_API_KEY` |
+| **Ollama (Local)** | ❌ No | Privacy, offline | [Install Ollama](https://ollama.com) |
+
+### Using Local Models with Ollama
+
+Run AI models locally without API costs or privacy concerns:
+
+```python
+# Install Ollama first: https://ollama.com
+# Pull a model: ollama pull llama3.2:3b
+
+from memvid import MemvidChat
+
+chat = MemvidChat(
+    video_file="memory.mp4",
+    index_file="index.json",
+    llm_provider='ollama',
+    llm_model='llama3.2:3b'  # or mistral, phi3, etc.
+)
+
+response = chat.chat("Your question")
+```
+
+See [OLLAMA_GUIDE.md](OLLAMA_GUIDE.md) for detailed Ollama setup and usage.
+
+### Switching Providers
+
+```python
+# Google Gemini (default)
+chat = MemvidChat(..., llm_provider='google', llm_model='gemini-2.0-flash-exp')
+
+# OpenAI
+chat = MemvidChat(..., llm_provider='openai', llm_model='gpt-4o')
+
+# Anthropic
+chat = MemvidChat(..., llm_provider='anthropic', llm_model='claude-3-5-sonnet-20241022')
+
+# Ollama (local)
+chat = MemvidChat(..., llm_provider='ollama', llm_model='llama3.2:3b')
 ```
 
 ## Advanced Features

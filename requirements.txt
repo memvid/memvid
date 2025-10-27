@@ -19,3 +19,4 @@ ebooklib
 openai==1.82.0
 google-genai==1.39.1
 anthropic~=0.52.1
+ollama>=0.4.8  # For local LLM inference (requires Ollama server installed)
