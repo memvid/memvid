@@ -189,7 +189,7 @@ class MemvidEncoder:
         )
 
     def _generate_qr_frames(self, temp_dir: Path, show_progress: bool = True, 
-                           enable_parallel: bool = False, parallel_threshold: int = 200) -> Path:
+                           enable_parallel = 'auto', parallel_threshold: int = 200) -> Path:
         """
         Generate QR code frames to temporary directory
         
@@ -460,10 +460,34 @@ class MemvidEncoder:
             }
 
 
+
+    def _should_use_parallel(self, chunk_count: int, enable_parallel: str = 'auto', 
+                            parallel_threshold: int = 200) -> bool:
+        """
+        Determine if parallel processing should be used
+        
+        Args:
+            chunk_count: Number of chunks to process
+            enable_parallel: 'auto' (default), True, or False
+            parallel_threshold: Minimum chunks for parallel mode
+            
+        Returns:
+            bool: Whether to use parallel processing
+        """
+        if enable_parallel == False:
+            return False
+        elif enable_parallel == True:
+            return chunk_count >= parallel_threshold
+        else:  # 'auto' mode
+            # Auto-enable for very large workloads (500+ chunks)
+            # This overcomes the ~120s Windows spawn overhead
+            AUTO_PARALLEL_THRESHOLD = 500
+            return chunk_count >= AUTO_PARALLEL_THRESHOLD
+
     def build_video(self, output_file: str, index_file: str,
                     codec: str = VIDEO_CODEC, show_progress: bool = True,
                     auto_build_docker: bool = True, allow_fallback: bool = True,
-                    enable_parallel: bool = False, parallel_threshold: int = 200) -> Dict[str, Any]:
+                    enable_parallel = 'auto', parallel_threshold: int = 200) -> Dict[str, Any]:
         """
         Build QR code video and index from chunks with unified codec handling
 
@@ -474,7 +498,7 @@ class MemvidEncoder:
             show_progress: Show progress bar
             auto_build_docker: Whether to auto-build Docker if needed
             allow_fallback: Whether to fall back to MP4V if advanced codec fails
-            enable_parallel: Enable multiprocessing for QR generation (default: False)
+            enable_parallel: 'auto' (smart detection), True (force on), False (force off)
             parallel_threshold: Minimum chunks to use parallel (default: 200)
 
         Returns:
@@ -496,7 +520,8 @@ class MemvidEncoder:
             temp_path = Path(temp_dir)
 
             # Generate QR frames (always local)
-            frames_dir = self._generate_qr_frames(temp_path, show_progress, enable_parallel, parallel_threshold)
+            use_parallel = self._should_use_parallel(len(self.chunks), enable_parallel, parallel_threshold)
+            frames_dir = self._generate_qr_frames(temp_path, show_progress, use_parallel, parallel_threshold)
 
             try:
                 from .config import codec_parameters
