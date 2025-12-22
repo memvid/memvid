@@ -188,13 +188,16 @@ class MemvidEncoder:
             (codec_config["frame_width"], codec_config["frame_height"])
         )
 
-    def _generate_qr_frames(self, temp_dir: Path, show_progress: bool = True) -> Path:
+    def _generate_qr_frames(self, temp_dir: Path, show_progress: bool = True, 
+                           enable_parallel = 'auto', parallel_threshold: int = 200) -> Path:
         """
         Generate QR code frames to temporary directory
         
         Args:
             temp_dir: Temporary directory for frame storage
             show_progress: Show progress bar
+            enable_parallel: Enable multiprocessing (Windows: only for 200+ chunks)
+            parallel_threshold: Minimum chunks to enable parallel (default: 200)
             
         Returns:
             Path to frames directory
@@ -202,19 +205,51 @@ class MemvidEncoder:
         frames_dir = temp_dir / "frames"
         frames_dir.mkdir()
 
-        chunks_iter = enumerate(self.chunks)
-        if show_progress:
-            chunks_iter = tqdm(chunks_iter, total=len(self.chunks), desc="Generating QR frames")
+        # Decide whether to use parallel processing
+        use_parallel = enable_parallel and len(self.chunks) >= parallel_threshold
+        
+        if use_parallel:
+            # Parallel processing for very large workloads only
+            import os
+            import warnings
+            from concurrent.futures import ProcessPoolExecutor
+            from .utils import generate_qr_frame_worker
+            
+            warnings.warn(
+                f"Using parallel processing with {len(self.chunks)} chunks. "
+                f"On Windows, this has ~120s startup overhead. Only beneficial for 500+ chunks.",
+                UserWarning
+            )
+            
+            frames_dir_str = str(frames_dir)
+            args_list = [(i, chunk, frames_dir_str) for i, chunk in enumerate(self.chunks)]
+            max_workers = min(os.cpu_count() or 4, len(self.chunks))
+            
+            if show_progress:
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    list(tqdm(executor.map(generate_qr_frame_worker, args_list), 
+                             total=len(args_list), 
+                             desc=f"Generating QR frames ({max_workers} cores)"))
+            else:
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    list(executor.map(generate_qr_frame_worker, args_list))
+            
+            print(f"FRAMES: {len(self.chunks)} files in {frames_dir} (parallel: {max_workers} cores)")
+        else:
+            # Serial processing (default, recommended for Windows)
+            chunks_iter = enumerate(self.chunks)
+            if show_progress:
+                chunks_iter = tqdm(chunks_iter, total=len(self.chunks), desc="Generating QR frames")
 
-        for frame_num, chunk in chunks_iter:
-            chunk_data = {"id": frame_num, "text": chunk, "frame": frame_num}
-            qr_image = encode_to_qr(json.dumps(chunk_data))
-            frame_path = frames_dir / f"frame_{frame_num:06d}.png"
-            qr_image.save(frame_path)
+            for frame_num, chunk in chunks_iter:
+                chunk_data = {"id": frame_num, "text": chunk, "frame": frame_num}
+                qr_image = encode_to_qr(json.dumps(chunk_data))
+                frame_path = frames_dir / f"frame_{frame_num:06d}.png"
+                qr_image.save(frame_path)
+
+            print(f"FRAMES: {len(self.chunks)} files in {frames_dir} (serial)")
 
         created_frames = list(frames_dir.glob("frame_*.png"))
-        print(f"🐛 FRAMES: {len(created_frames)} files in {frames_dir}")
-
         logger.info(f"Generated {len(self.chunks)} QR frames in {frames_dir}")
         return frames_dir
 
@@ -268,8 +303,8 @@ class MemvidEncoder:
         thread_count = min(os.cpu_count() or 4, 16)
         cmd.extend(['-threads', str(thread_count)])
 
-        print(f"🎬 FFMPEG ENCODING SUMMARY:")
-        print(f"   🎥 Codec Config:")
+        print(f"FFMPEG ENCODING SUMMARY:")
+        print(f"   Codec Config:")
         print(f"      • codec: {codec}")
         print(f"      • file_type: {codec_config.get('video_file_type', 'unknown')}")
         print(f"      • fps: {codec_config.get('fps', 'default')}")
@@ -383,7 +418,7 @@ class MemvidEncoder:
         # Use full codec mapping
         from .config import codec_parameters
 
-        print(f"🐛 FFMPEG: frames={frames_dir} → docker_mount={frames_dir.parent}")
+        print(f"FFMPEG: frames={frames_dir} -> docker_mount={frames_dir.parent}")
 
         cmd = self._build_ffmpeg_command(frames_dir, output_file, codec)
 
@@ -425,9 +460,34 @@ class MemvidEncoder:
             }
 
 
+
+    def _should_use_parallel(self, chunk_count: int, enable_parallel: str = 'auto', 
+                            parallel_threshold: int = 200) -> bool:
+        """
+        Determine if parallel processing should be used
+        
+        Args:
+            chunk_count: Number of chunks to process
+            enable_parallel: 'auto' (default), True, or False
+            parallel_threshold: Minimum chunks for parallel mode
+            
+        Returns:
+            bool: Whether to use parallel processing
+        """
+        if enable_parallel == False:
+            return False
+        elif enable_parallel == True:
+            return chunk_count >= parallel_threshold
+        else:  # 'auto' mode
+            # Auto-enable for very large workloads (500+ chunks)
+            # This overcomes the ~120s Windows spawn overhead
+            AUTO_PARALLEL_THRESHOLD = 500
+            return chunk_count >= AUTO_PARALLEL_THRESHOLD
+
     def build_video(self, output_file: str, index_file: str,
                     codec: str = VIDEO_CODEC, show_progress: bool = True,
-                    auto_build_docker: bool = True, allow_fallback: bool = True) -> Dict[str, Any]:
+                    auto_build_docker: bool = True, allow_fallback: bool = True,
+                    enable_parallel = 'auto', parallel_threshold: int = 200) -> Dict[str, Any]:
         """
         Build QR code video and index from chunks with unified codec handling
 
@@ -438,6 +498,8 @@ class MemvidEncoder:
             show_progress: Show progress bar
             auto_build_docker: Whether to auto-build Docker if needed
             allow_fallback: Whether to fall back to MP4V if advanced codec fails
+            enable_parallel: 'auto' (smart detection), True (force on), False (force off)
+            parallel_threshold: Minimum chunks to use parallel (default: 200)
 
         Returns:
             Dictionary with build statistics
@@ -458,7 +520,8 @@ class MemvidEncoder:
             temp_path = Path(temp_dir)
 
             # Generate QR frames (always local)
-            frames_dir = self._generate_qr_frames(temp_path, show_progress)
+            use_parallel = self._should_use_parallel(len(self.chunks), enable_parallel, parallel_threshold)
+            frames_dir = self._generate_qr_frames(temp_path, show_progress, use_parallel, parallel_threshold)
 
             try:
                 from .config import codec_parameters

@@ -240,8 +240,8 @@ class DockerManager:
         output_dir = output_file.parent
         docker_output_dir = self._convert_path_for_docker(output_dir)
 
-        print(f"🐛 DOCKER: {working_dir} → {docker_working_dir}")
-        print(f"🐛 OUTPUT: {output_dir} → {docker_output_dir}")
+        print(f"DOCKER: {working_dir} -> {docker_working_dir}")
+        print(f"OUTPUT: {output_dir} -> {docker_output_dir}")
 
         # Check what's actually mounted
         check_cmd = [self.docker_cmd, "run", "--rm",
@@ -249,14 +249,14 @@ class DockerManager:
                      "find", "/workspace", "-name", "*.png"]
         check_result = subprocess.run(check_cmd, capture_output=True, text=True)
         png_count = len(check_result.stdout.strip().split('\n')) if check_result.stdout.strip() else 0
-        print(f"🐛 DOCKER: Found {png_count} PNG files in container")
+        print(f"DOCKER: Found {png_count} PNG files in container")
 
         # FIXED: Convert output path to point to mounted output directory
         docker_cmd = self._convert_ffmpeg_command_paths(cmd, working_dir)
         # Replace /workspace/output/ with /host_output/
         docker_cmd = [arg.replace('/workspace/output/', '/host_output/') for arg in docker_cmd]
 
-        print(f"🐛 FFMPEG CMD: {' '.join(docker_cmd)}")
+        print(f"FFMPEG CMD: {' '.join(docker_cmd)}")
 
         cmd_data = {"command": docker_cmd, "working_dir": "/workspace"}
         container_cmd = ["python3", "/scripts/ffmpeg_executor.py", json.dumps(cmd_data)]
@@ -274,12 +274,12 @@ class DockerManager:
             result = subprocess.run(full_docker_cmd, capture_output=True, text=True, timeout=3600)
 
             if result.returncode != 0:
-                print(f"🐛 FFMPEG ERROR: {result.stderr}")
+                print(f"FFMPEG ERROR: {result.stderr}")
                 raise RuntimeError(f"Docker FFmpeg execution failed: {result.stderr}")
 
             # File should now exist directly on host
             file_size_mb = output_file.stat().st_size / (1024 * 1024) if output_file.exists() else 0
-            print(f"🐛 SUCCESS: Output file size: {file_size_mb:.2f} MB")
+            print(f"SUCCESS: Output file size: {file_size_mb:.2f} MB")
 
             return {
                 "backend": "docker",

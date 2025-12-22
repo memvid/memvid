@@ -17,7 +17,7 @@ DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_OVERLAP = 32
 
 # Codec Settings
-VIDEO_CODEC = 'mp4v'        # Valid options are: mpv4, h265 or hevc, h264 or avc, and av1
+VIDEO_CODEC = 'h265'        # Valid options are: mpv4, h265 or hevc, h264 or avc, and av1
 MP4V_PARAMETERS= {"video_file_type": "mp4",
                   "video_fps": 15,
                   "frame_height": 256,
@@ -58,20 +58,10 @@ AV1_PARAMETERS = {"video_file_type": "mkv",
                   "pix_fmt": "yuv420p",
                   "extra_ffmpeg_args": "-x265-params keyint=1:tune=stillimage"}
 
-VP9_PARAMETERS = {"video_file_type": "webm",
-                  "video_fps": 30,
-                  "video_crf": 31,
-                  "frame_height": 256,
-                  "frame_width": 256,
-                  "video_preset": "good",
-                  "pix_fmt": "yuv420p",
-                  "extra_ffmpeg_args": "-deadline realtime -cpu-used 8"}
-
 codec_parameters = {"mp4v": MP4V_PARAMETERS,
                     "h265": H265_PARAMETERS, "hevc": H265_PARAMETERS,
                     "h264": H264_PARAMETERS, "avc": H264_PARAMETERS,
-                    "av1": AV1_PARAMETERS,
-                    "vp9": VP9_PARAMETERS, "webm": VP9_PARAMETERS}
+                    "av1": AV1_PARAMETERS}
 
 # Retrieval settings
 DEFAULT_TOP_K = 5
