@@ -90,7 +90,7 @@ def test_ffmpeg_executor():
             "working_dir": str(work_dir)
         }
 
-        print(f"🎬 Running FFmpeg command...")
+        print("🎬 Running FFmpeg command...")
         print(f"   Input: {frames_dir}")
         print(f"   Output: {output_file}")
 
@@ -107,7 +107,7 @@ def test_ffmpeg_executor():
 
         encoding_time = time.time() - start_time
 
-        print(f"📊 FFmpeg executor results:")
+        print("📊 FFmpeg executor results:")
         print(f"   Return code: {result.returncode}")
         print(f"   Encoding time: {encoding_time:.1f}s")
 
@@ -121,7 +121,7 @@ def test_ffmpeg_executor():
             file_size_mb = file_size / (1024 * 1024)
             chunks_per_mb = len(test_chunks) / file_size_mb if file_size_mb > 0 else 0
 
-            print(f"✅ FFmpeg executor test passed!")
+            print("✅ FFmpeg executor test passed!")
             print(f"   Created: {file_size} bytes ({file_size_mb:.2f} MB)")
             print(f"   Encoded: {len(test_chunks)} chunks")
             print(f"   Density: {chunks_per_mb:.0f} chunks/MB")
@@ -141,15 +141,15 @@ def test_ffmpeg_executor():
                         print(f"   ✅ Frames: {video_stream.get('nb_frames', 'unknown')}")
                         print(f"   ✅ Resolution: {video_stream.get('width')}x{video_stream.get('height')}")
                     else:
-                        print(f"   ⚠️  No video stream found in probe data")
+                        print("   ⚠️  No video stream found in probe data")
                 except json.JSONDecodeError:
-                    print(f"   ⚠️  Could not parse ffprobe output")
+                    print("   ⚠️  Could not parse ffprobe output")
             else:
                 print(f"   ⚠️  ffprobe failed: {probe_result.stderr}")
 
             return True
         else:
-            print(f"❌ FFmpeg executor test failed!")
+            print("❌ FFmpeg executor test failed!")
             print(f"   Output file exists: {output_file.exists()}")
             if output_file.exists():
                 print(f"   Output file size: {output_file.stat().st_size}")
@@ -206,10 +206,10 @@ def test_basic_functionality():
         test_file = Path("/data/temp/test.txt")
         test_file.write_text("test")
         if test_file.read_text() == "test":
-            print(f"   ✅ File system: OK")
+            print("   ✅ File system: OK")
             test_file.unlink()
         else:
-            print(f"   ❌ File system: Read/write failed")
+            print("   ❌ File system: Read/write failed")
             return False
     except Exception as e:
         print(f"   ❌ File system: Error - {e}")

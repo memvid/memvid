@@ -13,7 +13,7 @@ from tqdm import tqdm
 import cv2
 import numpy as np
 
-from .utils import encode_to_qr, qr_to_frame, chunk_text
+from .utils import encode_to_qr, chunk_text
 from .index import IndexManager
 from .config import get_default_config, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP, VIDEO_CODEC, get_codec_parameters
 from .docker_manager import DockerManager
@@ -268,8 +268,8 @@ class MemvidEncoder:
         thread_count = min(os.cpu_count() or 4, 16)
         cmd.extend(['-threads', str(thread_count)])
 
-        print(f"🎬 FFMPEG ENCODING SUMMARY:")
-        print(f"   🎥 Codec Config:")
+        print("🎬 FFMPEG ENCODING SUMMARY:")
+        print("   🎥 Codec Config:")
         print(f"      • codec: {codec}")
         print(f"      • file_type: {codec_config.get('video_file_type', 'unknown')}")
         print(f"      • fps: {codec_config.get('fps', 'default')}")
@@ -461,7 +461,6 @@ class MemvidEncoder:
             frames_dir = self._generate_qr_frames(temp_path, show_progress)
 
             try:
-                from .config import codec_parameters
                 # Choose encoding method based on codec
                 if codec == "mp4v":
                     # Always use OpenCV for MP4V

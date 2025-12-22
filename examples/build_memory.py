@@ -63,7 +63,7 @@ def main():
     
     # Get stats
     stats = encoder.get_stats()
-    print(f"\nEncoder stats:")
+    print("\nEncoder stats:")
     print(f"  Total chunks: {stats['total_chunks']}")
     print(f"  Total characters: {stats['total_characters']}")
     print(f"  Average chunk size: {stats['avg_chunk_size']:.1f} chars")
@@ -83,7 +83,7 @@ def main():
     elapsed = time.time() - start_time
     
     print(f"\nBuild completed in {elapsed:.2f} seconds")
-    print(f"\nVideo stats:")
+    print("\nVideo stats:")
     print(f"  Duration: {build_stats['duration_seconds']:.1f} seconds")
     print(f"  Size: {build_stats['video_size_mb']:.2f} MB")
     print(f"  FPS: {build_stats['fps']}")
@@ -94,8 +94,8 @@ def main():
         print(f"  {key}: {value}")
     
     print("\nSuccess! Video memory created.")
-    print(f"\nYou can now use this memory with:")
-    print(f"  python examples/chat_memory.py")
+    print("\nYou can now use this memory with:")
+    print("  python examples/chat_memory.py")
 
 
 if __name__ == "__main__":

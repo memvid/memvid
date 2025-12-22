@@ -5,14 +5,12 @@ MemvidRetriever - Fast semantic search, QR frame extraction, and context assembl
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict, Any, Optional
 import time
-from functools import lru_cache
 import cv2
 
 from .utils import (
-    extract_frame, decode_qr, batch_extract_and_decode,
+    batch_extract_and_decode,
     extract_and_decode_cached
 )
 from .index import IndexManager

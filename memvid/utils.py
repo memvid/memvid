@@ -2,21 +2,20 @@
 Shared utility functions for Memvid
 """
 
-import io
 import json
 import qrcode
 import cv2
 import numpy as np
 from PIL import Image
 from typing import List, Tuple, Optional, Dict, Any
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 import logging
 from tqdm import tqdm
 import base64
 import gzip
 
-from .config import get_default_config, codec_parameters
+from .config import get_default_config
 
 logger = logging.getLogger(__name__)
 

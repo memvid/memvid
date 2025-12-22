@@ -2,7 +2,6 @@
 # Save this as: docker/resource_monitor.py
 
 import psutil
-import time
 import json
 import argparse
 import sys

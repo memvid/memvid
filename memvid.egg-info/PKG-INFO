@@ -1,60 +1,33 @@
 Metadata-Version: 2.4
 Name: memvid
-Version: 0.1.3
-Summary: Video-based AI memory library for fast semantic search and retrieval
+Version: 0.1.0
+Summary: Add your description here
 Home-page: https://github.com/olow304/memvid
 Author: Saleban Olow
 Author-email: olow30@gmail.com
-Classifier: Development Status :: 3 - Alpha
-Classifier: Intended Audience :: Developers
-Classifier: Topic :: Software Development :: Libraries :: Python Modules
-Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
-Classifier: Topic :: Multimedia :: Video
-Classifier: License :: OSI Approved :: MIT License
-Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.8
-Classifier: Programming Language :: Python :: 3.9
-Classifier: Programming Language :: Python :: 3.10
-Classifier: Programming Language :: Python :: 3.11
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: qrcode[pil]>=7.3
-Requires-Dist: opencv-python>=4.5.0
-Requires-Dist: opencv-contrib-python>=4.5.0
-Requires-Dist: sentence-transformers>=2.2.0
-Requires-Dist: numpy<2.0.0,>=1.21.0
-Requires-Dist: tqdm>=4.50.0
-Requires-Dist: faiss-cpu>=1.7.0
-Requires-Dist: Pillow>=9.0.0
-Requires-Dist: python-dotenv>=0.19.0
-Requires-Dist: PyPDF2>=3.0.0
-Provides-Extra: dev
-Requires-Dist: pytest>=7.0.0; extra == "dev"
-Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
-Requires-Dist: black>=23.0.0; extra == "dev"
-Requires-Dist: flake8>=6.0.0; extra == "dev"
-Provides-Extra: llm
-Requires-Dist: openai>=1.0.0; extra == "llm"
-Requires-Dist: google-generativeai>=0.8.0; extra == "llm"
-Requires-Dist: anthropic>=0.52.0; extra == "llm"
-Provides-Extra: epub
-Requires-Dist: beautifulsoup4>=4.0.0; extra == "epub"
-Requires-Dist: ebooklib>=0.18; extra == "epub"
-Provides-Extra: web
-Requires-Dist: fastapi>=0.100.0; extra == "web"
-Requires-Dist: gradio>=4.0.0; extra == "web"
+Requires-Dist: anthropic~=0.52.1
+Requires-Dist: beautifulsoup4>=4.13.4
+Requires-Dist: ebooklib>=0.19
+Requires-Dist: faiss-cpu==1.11.0
+Requires-Dist: google-generativeai==0.8.5
+Requires-Dist: numpy==1.26.4
+Requires-Dist: openai==1.82.0
+Requires-Dist: opencv-contrib-python==4.11.0.86
+Requires-Dist: opencv-python==4.11.0.86
+Requires-Dist: pillow==11.2.1
+Requires-Dist: pypdf2==3.0.1
+Requires-Dist: python-dotenv==1.1.0
+Requires-Dist: qrcode[pil]==8.2
+Requires-Dist: sentence-transformers==4.1.0
+Requires-Dist: tqdm==4.67.1
 Dynamic: author
 Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
 Dynamic: home-page
 Dynamic: license-file
-Dynamic: provides-extra
-Dynamic: requires-dist
 Dynamic: requires-python
-Dynamic: summary
 
 # Memvid - Video-Based AI Memory 🧠📹
 
@@ -150,7 +123,7 @@ pip install PyPDF2
 from memvid import MemvidEncoder, MemvidChat
 
 # Create video memory from text chunks
-chunks = ["Important fact 1", "Important fact 2", "Historical event details", ...]
+chunks = ["Important fact 1", "Important fact 2", "Historical event details"]
 encoder = MemvidEncoder()
 encoder.add_chunks(chunks)
 encoder.build_video("memory.mp4", "memory_index.json")

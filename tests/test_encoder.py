@@ -2,10 +2,8 @@
 Tests for MemvidEncoder
 """
 
-import pytest
 import tempfile
 import os
-from pathlib import Path
 
 from memvid import MemvidEncoder
 
