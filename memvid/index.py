@@ -39,6 +39,9 @@ class IndexManager:
         self.chunk_to_frame = {}  # Maps chunk ID to frame number
         self.frame_to_chunks = {}  # Maps frame number to chunk IDs
         
+        # Frame order mapping (for frame ordering optimization)
+        self.frame_order_map = None
+        
     def _create_index(self) -> faiss.Index:
         """Create FAISS index based on configuration"""
         index_type = self.config["index"]["type"]
@@ -351,6 +354,27 @@ class IndexManager:
             return self.metadata[chunk_id]
         return None
     
+    def add_frame_order_mapping(self, optimized_order: List[int]):
+        """
+        Add frame order mapping for frame ordering optimization
+        
+        Args:
+            optimized_order: List of frame indices in optimized order
+        """
+        original_order = list(range(len(optimized_order)))
+        
+        # Create bidirectional mapping
+        original_to_video = optimized_order[:]
+        video_to_original = [0] * len(optimized_order)
+        
+        for original_idx, video_idx in enumerate(optimized_order):
+            video_to_original[video_idx] = original_idx
+        
+        self.frame_order_map = {
+            "original_to_video": original_to_video,
+            "video_to_original": video_to_original
+        }
+    
     def save(self, path: str):
         """
         Save index to disk
@@ -370,6 +394,10 @@ class IndexManager:
             "frame_to_chunks": self.frame_to_chunks,
             "config": self.config
         }
+        
+        # Add frame order mapping if it exists
+        if self.frame_order_map is not None:
+            data["frame_order_map"] = self.frame_order_map
         
         with open(path.with_suffix('.json'), 'w') as f:
             json.dump(data, f, indent=2)
@@ -395,6 +423,9 @@ class IndexManager:
         self.metadata = data["metadata"]
         self.chunk_to_frame = {int(k): v for k, v in data["chunk_to_frame"].items()}
         self.frame_to_chunks = {int(k): v for k, v in data["frame_to_chunks"].items()}
+        
+        # Load frame order mapping if it exists
+        self.frame_order_map = data.get("frame_order_map", None)
         
         # Update config if available
         if "config" in data:

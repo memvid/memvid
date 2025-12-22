@@ -424,10 +424,171 @@ class MemvidEncoder:
                 "duration_seconds": frame_count / codec_parameters[codec]["video_fps"]
             }
 
+    def _validate_frame_ordering_config(self, config: Optional[Dict[str, Any]]):
+        """
+        Validate frame ordering configuration parameters
+        
+        Args:
+            config: Frame ordering configuration to validate
+            
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        if config is None:
+            return  # Default config will be used
+        
+        # Validate power_base
+        if "power_base" in config:
+            power_base = config["power_base"]
+            if not isinstance(power_base, int) or power_base < 2:
+                raise ValueError(f"power_base must be an integer >= 2, got: {power_base}")
+        
+        # Validate max_resolution
+        if "max_resolution" in config:
+            max_resolution = config["max_resolution"]
+            if not isinstance(max_resolution, int) or max_resolution < 1:
+                raise ValueError(f"max_resolution must be a positive integer, got: {max_resolution}")
+        
+        # Validate start_with_1x1
+        if "start_with_1x1" in config:
+            start_with_1x1 = config["start_with_1x1"]
+            if not isinstance(start_with_1x1, bool):
+                raise ValueError(f"start_with_1x1 must be a boolean, got: {type(start_with_1x1)}")
+
+    def _apply_frame_ordering(self, frames_dir: Path, config: Optional[Dict[str, Any]], 
+                             show_progress: bool = True) -> Dict[str, Any]:
+        """
+        Apply frame ordering optimization to QR frames for better video compression
+        
+        Args:
+            frames_dir: Directory containing generated QR frames
+            config: Frame ordering configuration options
+            show_progress: Show progress indicator
+            
+        Returns:
+            Dictionary with frame ordering metadata
+        """
+        import time
+        from .frame_ordering import FrameOrderingOptimizer
+        
+        if show_progress:
+            logger.info("Applying frame ordering optimization...")
+        
+        start_time = time.time()
+        
+        try:
+            # Set up frame ordering configuration
+            ordering_config = config or {}
+            optimizer = FrameOrderingOptimizer(
+                power_base=ordering_config.get("power_base", 2),
+                max_resolution=ordering_config.get("max_resolution", 32),
+                start_with_1x1=ordering_config.get("start_with_1x1", True)
+            )
+            
+            # Load all QR frames for analysis
+            frame_files = sorted(frames_dir.glob("frame_*.png"))
+            if not frame_files:
+                raise ValueError("No QR frames found for ordering")
+            
+            frames = []
+            for frame_file in frame_files:
+                frame = cv2.imread(str(frame_file))
+                if frame is None:
+                    logger.warning(f"Could not load frame: {frame_file}")
+                    continue
+                
+                # Convert to grayscale for frame ordering analysis
+                gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frames.append(gray_frame)
+            
+            if len(frames) != len(frame_files):
+                logger.warning(f"Frame loading mismatch: {len(frames)} loaded vs {len(frame_files)} files")
+            
+            # Optimize frame order
+            optimized_indices, optimization_metadata = optimizer.optimize_frame_order(frames)
+            
+            # Reorder the actual frame files
+            self._reorder_frame_files(frames_dir, optimized_indices)
+            
+            optimization_time = time.time() - start_time
+            
+            # Create frame ordering metadata
+            frame_ordering_metadata = {
+                "optimized_order": optimized_indices,
+                "original_order": list(range(len(frames))),
+                "optimization_config": {
+                    "power_base": optimizer.power_base,
+                    "max_resolution": optimizer.max_resolution,
+                    "start_with_1x1": optimizer.start_with_1x1
+                },
+                "optimization_time": optimization_time,
+                "frame_count": len(frames)
+            }
+            frame_ordering_metadata.update(optimization_metadata)
+            
+            if show_progress:
+                logger.info(f"Frame ordering completed in {optimization_time:.2f}s")
+                logger.info(f"Reordered {len(frames)} frames using resolution sequence: {optimization_metadata.get('resolution_sequence', [])}")
+            
+            return frame_ordering_metadata
+            
+        except Exception as e:
+            optimization_time = time.time() - start_time
+            logger.warning(f"Frame ordering failed: {e}")
+            
+            # Return error metadata for graceful degradation
+            return {
+                "error": str(e),
+                "optimization_time": optimization_time,
+                "original_order": list(range(len(self.chunks))),
+                "optimized_order": list(range(len(self.chunks)))  # No reordering due to error
+            }
+
+    def _reorder_frame_files(self, frames_dir: Path, optimized_indices: List[int]):
+        """
+        Reorder frame files according to optimized indices
+        
+        Args:
+            frames_dir: Directory containing frame files
+            optimized_indices: List of indices in optimized order
+        """
+        import shutil
+        
+        frame_files = sorted(frames_dir.glob("frame_*.png"))
+        
+        if len(optimized_indices) != len(frame_files):
+            raise ValueError(f"Index count mismatch: {len(optimized_indices)} vs {len(frame_files)}")
+        
+        # Create temporary directory for reordering
+        temp_reorder_dir = frames_dir.parent / "frames_reordered"
+        temp_reorder_dir.mkdir()
+        
+        try:
+            # Copy files in optimized order
+            for new_position, original_index in enumerate(optimized_indices):
+                original_file = frame_files[original_index]
+                new_file = temp_reorder_dir / f"frame_{new_position:06d}.png"
+                shutil.copy2(original_file, new_file)
+            
+            # Remove original frames and replace with reordered ones
+            for frame_file in frame_files:
+                frame_file.unlink()
+            
+            # Move reordered frames back
+            for reordered_file in temp_reorder_dir.glob("frame_*.png"):
+                final_file = frames_dir / reordered_file.name
+                shutil.move(str(reordered_file), str(final_file))
+                
+        finally:
+            # Clean up temporary directory
+            if temp_reorder_dir.exists():
+                shutil.rmtree(temp_reorder_dir)
 
     def build_video(self, output_file: str, index_file: str,
                     codec: str = VIDEO_CODEC, show_progress: bool = True,
-                    auto_build_docker: bool = True, allow_fallback: bool = True) -> Dict[str, Any]:
+                    auto_build_docker: bool = True, allow_fallback: bool = True,
+                    enable_frame_ordering: bool = False,
+                    frame_ordering_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Build QR code video and index from chunks with unified codec handling
 
@@ -438,6 +599,8 @@ class MemvidEncoder:
             show_progress: Show progress bar
             auto_build_docker: Whether to auto-build Docker if needed
             allow_fallback: Whether to fall back to MP4V if advanced codec fails
+            enable_frame_ordering: Enable frame ordering optimization for better compression
+            frame_ordering_config: Configuration for frame ordering (power_base, max_resolution, etc.)
 
         Returns:
             Dictionary with build statistics
@@ -459,6 +622,16 @@ class MemvidEncoder:
 
             # Generate QR frames (always local)
             frames_dir = self._generate_qr_frames(temp_path, show_progress)
+
+            # Apply frame ordering optimization if enabled
+            frame_ordering_metadata = None
+            if enable_frame_ordering:
+                # Validate frame ordering configuration upfront
+                self._validate_frame_ordering_config(frame_ordering_config)
+                
+                frame_ordering_metadata = self._apply_frame_ordering(
+                    frames_dir, frame_ordering_config, show_progress
+                )
 
             try:
                 from .config import codec_parameters
@@ -485,6 +658,10 @@ class MemvidEncoder:
             frame_numbers = list(range(len(self.chunks)))
             self.index_manager.add_chunks(self.chunks, frame_numbers, show_progress)
 
+            # Add frame order mapping to index if frame ordering was enabled
+            if frame_ordering_metadata and "optimized_order" in frame_ordering_metadata:
+                self._add_frame_order_mapping_to_index(frame_ordering_metadata)
+
             # Save index
             self.index_manager.save(str(index_path.with_suffix('')))
 
@@ -495,6 +672,10 @@ class MemvidEncoder:
                 "index_file": str(index_path),
                 "index_stats": self.index_manager.get_stats()
             })
+
+            # Add frame ordering metadata if enabled
+            if frame_ordering_metadata:
+                stats["frame_ordering"] = frame_ordering_metadata
 
             if show_progress:
                 logger.info(f"Successfully built video: {output_path}")
@@ -511,6 +692,8 @@ class MemvidEncoder:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get encoder statistics"""
+        from .config import codec_parameters
+        
         docker_status = "disabled"
         if self.dcker_mngr:
             docker_status = "available" if self.dcker_mngr.is_available() else "unavailable"
@@ -520,7 +703,7 @@ class MemvidEncoder:
             "total_characters": sum(len(chunk) for chunk in self.chunks),
             "avg_chunk_size": np.mean([len(chunk) for chunk in self.chunks]) if self.chunks else 0,
             "docker_status": docker_status,
-            "supported_codecs": list(self.config["codec_parameters"].keys()),
+            "supported_codecs": list(codec_parameters.keys()),
             "config": self.config
         }
 
@@ -574,3 +757,14 @@ class MemvidEncoder:
             encoder.add_text(doc, chunk_size, overlap)
 
         return encoder
+
+    def _add_frame_order_mapping_to_index(self, frame_ordering_metadata: Dict[str, Any]):
+        """
+        Add frame order mapping to index
+        
+        Args:
+            frame_ordering_metadata: Dictionary with frame ordering metadata
+        """
+        optimized_order = frame_ordering_metadata["optimized_order"]
+        
+        self.index_manager.add_frame_order_mapping(optimized_order)

@@ -25,3 +25,41 @@ memvid.egg-info/
 memvid.egg-info/*
 dist/memvid-*/
 
+# IDE/editor directories
+.vscode/
+.idea/
+
+# Virtual environment directories
+.env/
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Coverage and test output
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+.cache/
+
+# Type checker and linter caches
+.mypy_cache/
+.dmypy.json
+.pytype/
+
+# Logs
+*.log
+
+# Binary media and generated artifacts
+*.mp4
+*.png
+
+# Benchmark result artifacts
+benchmark_results.json
+scaling_results.json
+
