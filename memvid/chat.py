@@ -122,6 +122,8 @@ The context will be provided with each query based on semantic similarity to the
         # Build messages for LLM
         messages = self._build_messages(message, context)
 
+        print(f"Build message for llm :{messages}")
+
         # Add to conversation history
         self.conversation_history.append({"role": "user", "content": message})
 
@@ -352,7 +354,8 @@ User question: {message}"""
             'video_file': self.video_file,
             'index_file': self.index_file,
             'context_chunks_per_query': self.context_chunks,
-            'max_history': self.max_history
+            'max_history': self.max_history,
+            'retriever_stats':self.retriever.get_stats()
         }
 
 

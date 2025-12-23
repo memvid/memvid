@@ -5,8 +5,10 @@ import os
 import json
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Iterator
-
+from dashscope.api_entities.dashscope_response import (GenerationResponse,
+                                                       Message, Role)
 from memvid.config import DEFAULT_LLM_MODELS
+
 
 # Optional imports with availability checking
 try:
@@ -29,6 +31,15 @@ try:
 except ImportError:
     ANTHROPIC_AVAILABLE = False
     print("Warning: Anthropic library not available. Anthropic provider will be disabled.")
+
+
+try:
+    import dashscope
+    from dashscope import Generation
+    QWEN3_AVAILABLE = True
+except ImportError:
+    QWEN3_AVAILABLE = False
+    print("Warning: Qwen3 dashscope library not available. Qwen3 provider will be disabled.")
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers"""
@@ -300,6 +311,56 @@ class AnthropicProvider(LLMProvider):
             elif chunk.type == "message_stop":
                 break
 
+class QWen3Provider(LLMProvider):
+    """QWen3 provider implementation"""
+    def __init__(self, api_key: str, model: str = "qwen-max"):
+        self.client = Generation
+        self.api_key = api_key
+        self.model = model
+
+    def chat(self, messages: List[Dict[str, str]], stream: bool = False, **kwargs) -> Any:
+        """Send chat messages to Dashscope Qwen3"""
+        try:
+            qwen_messages = self._convert_messages_to_qwen3(messages)
+
+            response = self.client.call(
+                api_key=self.api_key,
+                model=self.model,
+                messages=qwen_messages,
+                stream=stream,
+                **kwargs
+            )
+
+            if stream:
+                return self._stream_response(response)
+            else:
+                return response.output.text
+
+        except Exception as e:
+            print(f"Qwen3 API error: {e}")
+            return None
+
+    def chat_stream(self, messages: List[Dict[str, str]], **kwargs) -> Iterator[str]:
+        """Stream chat response from QWen3"""
+        return self.chat(messages, stream=True, **kwargs)
+
+    def _convert_messages_to_qwen3(self, messages: List[Dict[str, str]]) -> List[Message]:
+        """Convert message format to Dashscope messag  format """
+        qwen3_messages = []
+
+        for message in messages:
+            role = message.get('role', 'user')
+            content = message.get('content', '')
+            qwen3_messages.append(Message(role=role,content= content))
+
+        return qwen3_messages
+
+    def _stream_response(self, response) -> Iterator[str]:
+        """Process streaming response from Qwen3"""
+        for chunk in response:
+            if response.output.text is not None:
+                yield response.output.text
+
 class LLMClient:
     """Unified LLM client that supports multiple providers"""
 
@@ -307,6 +368,7 @@ class LLMClient:
         'openai': OpenAIProvider,
         'google': GoogleProvider,
         'anthropic': AnthropicProvider,
+        'qwen3': QWen3Provider,
     }
 
     def __init__(self, provider: str = 'google', model: str = None, api_key: str = None):
@@ -319,7 +381,8 @@ class LLMClient:
         availability_map = {
             'openai': OPENAI_AVAILABLE,
             'google': GOOGLE_AVAILABLE,
-            'anthropic': ANTHROPIC_AVAILABLE
+            'anthropic': ANTHROPIC_AVAILABLE,
+            'qwen3': QWEN3_AVAILABLE,
         }
 
         if not availability_map[self.provider_name]:
@@ -349,6 +412,7 @@ class LLMClient:
             'openai': ['OPENAI_API_KEY'],
             'google': ['GOOGLE_API_KEY'],
             'anthropic': ['ANTHROPIC_API_KEY'],
+            'qwen3': ['QWEN3_API_KEY'],
         }
 
         for key in env_keys.get(provider.lower(), []):
@@ -364,6 +428,7 @@ class LLMClient:
             'openai': ['OPENAI_API_KEY'],
             'google': ['GOOGLE_API_KEY'],
             'anthropic': ['ANTHROPIC_API_KEY'],
+            'qwen3': ['QWEN3_API_KEY'],
         }
         return env_keys.get(provider.lower(), [])
 
@@ -391,7 +456,8 @@ class LLMClient:
         availability_map = {
             'openai': OPENAI_AVAILABLE,
             'google': GOOGLE_AVAILABLE,
-            'anthropic': ANTHROPIC_AVAILABLE
+            'anthropic': ANTHROPIC_AVAILABLE,
+            'qwen3' : QWEN3_AVAILABLE,
         }
         return [provider for provider, available in availability_map.items() if available]
 
