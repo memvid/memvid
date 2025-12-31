@@ -16,6 +16,7 @@ QR_BACK_COLOR = "white"
 DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_OVERLAP = 32
 
+VIDEO_FILE_TYPE="mkv"
 # Codec Settings
 VIDEO_CODEC = 'h265'        # Valid options are: mpv4, h265 or hevc, h264 or avc, and av1
 MP4V_PARAMETERS= {"video_file_type": "mp4",

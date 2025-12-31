@@ -72,7 +72,7 @@ def main():
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
     
-    video_file = os.path.join(output_dir, f"memory.{VIDEO_FILE_TYPE}]")
+    video_file = os.path.join(output_dir, f"memory.{VIDEO_FILE_TYPE}")
     index_file = os.path.join(output_dir, "memory_index.json")
     
     print(f"\nBuilding video: {video_file}")

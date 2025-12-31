@@ -1,4 +1,6 @@
 .env
+build
+.idea
 .DS_Store
 .memvid/
 output/
