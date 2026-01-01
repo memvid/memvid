@@ -2,8 +2,6 @@
 Tests for utility functions
 """
 
-import pytest
-import numpy as np
 from PIL import Image
 import tempfile
 import os

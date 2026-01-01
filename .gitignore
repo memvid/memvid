@@ -24,4 +24,8 @@ memvid/__pycache__/
 memvid.egg-info/
 memvid.egg-info/*
 dist/memvid-*/
+.env
+.vscode
 
+
+uv.lock

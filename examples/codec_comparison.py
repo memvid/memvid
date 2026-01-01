@@ -24,7 +24,7 @@ except ImportError as e:
     print(f"❌ Could not import MemvidEncoder from {project_root}")
     print(f"   Error: {e}")
     print(f"   Current working directory: {Path.cwd()}")
-    print(f"   Python path includes:")
+    print("   Python path includes:")
     for p in sys.path[:5]:  # Show first 5 paths
         print(f"     {p}")
     print()
@@ -224,7 +224,7 @@ def test_codec(encoder, codec, name_stem, output_dir):
 
         # Check for zero-byte files
         if file_size == 0:
-            print(f"   ❌ Zero-byte file created - encoding failed")
+            print("   ❌ Zero-byte file created - encoding failed")
             return {
                 'success': False,
                 'codec': codec,
@@ -271,7 +271,7 @@ def run_multi_codec_comparison(encoder, data_info, codecs, output_dir="output"):
         # Use file name for single files
         name_stem = f"{Path(data_info['file_name']).stem}_{timestamp}"
 
-    print(f"\n🏁 Multi-Codec Comparison Starting")
+    print("\n🏁 Multi-Codec Comparison Starting")
     print("=" * 60)
     print(f"📁 Output prefix: {name_stem}")
 
@@ -285,7 +285,7 @@ def run_multi_codec_comparison(encoder, data_info, codecs, output_dir="output"):
 def print_comparison_table(data_info, results, codecs):
     """Print detailed comparison table - FIXED zero division"""
 
-    print(f"\n📊 MULTI-CODEC COMPARISON RESULTS")
+    print("\n📊 MULTI-CODEC COMPARISON RESULTS")
     print("=" * 80)
 
     if data_info['type'] == 'directory':
@@ -335,7 +335,7 @@ def print_comparison_table(data_info, results, codecs):
 
             # Calculate storage efficiency
             total_chunks = data_info['chunks']
-            print(f"\n💾 Storage Efficiency (chunks per MB):")
+            print("\n💾 Storage Efficiency (chunks per MB):")
             print(f"📦 Total chunks in dataset: {total_chunks}")
 
             storage_efficiency = []
@@ -352,13 +352,13 @@ def print_comparison_table(data_info, results, codecs):
             # Sort by efficiency (highest chunks per MB first)
             storage_efficiency.sort(key=lambda x: x[1], reverse=True)
 
-            print(f"\n🏆 Storage Efficiency Ranking:")
+            print("\n🏆 Storage Efficiency Ranking:")
             for i, (codec, chunks_per_mb, file_size_mb) in enumerate(storage_efficiency, 1):
                 efficiency_vs_best = chunks_per_mb / storage_efficiency[0][1] if storage_efficiency[0][1] > 0 else 0
                 print(f"   {i}. {codec.upper()}: {chunks_per_mb:.1f} chunks/MB ({efficiency_vs_best:.1%} of best)")
 
     if failed_results:
-        print(f"\n❌ FAILED ENCODINGS:")
+        print("\n❌ FAILED ENCODINGS:")
         print("-" * 40)
         for codec, result in failed_results:
             print(f"   {codec.upper()}: {result['error']}")
@@ -394,7 +394,7 @@ def main():
     # Determine available codecs
     available_codecs = get_available_codecs(encoder)
 
-    print(f"\n🎛️  Available Codecs:")
+    print("\n🎛️  Available Codecs:")
     for codec, backend in available_codecs.items():
         print(f"   {codec.upper()}: {backend}")
 
@@ -425,7 +425,7 @@ def main():
     # Show results
     print_comparison_table(data_info, results, test_codecs)
 
-    print(f"\n🎉 Multi-codec comparison complete!")
+    print("\n🎉 Multi-codec comparison complete!")
 
 if __name__ == '__main__':
     main()

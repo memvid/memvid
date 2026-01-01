@@ -54,7 +54,7 @@ def main():
     
     # Get stats
     stats = chat.get_stats()
-    print(f"\nMemory loaded successfully!")
+    print("\nMemory loaded successfully!")
     print(f"  Total chunks: {stats['retriever_stats']['index_stats']['total_chunks']}")
     print(f"  LLM available: {stats['llm_available']}")
     if stats['llm_available']:

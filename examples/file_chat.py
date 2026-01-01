@@ -33,7 +33,6 @@ Examples:
 """
 
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
@@ -90,7 +89,7 @@ def create_memory_with_fallback(encoder, video_path, index_path):
         error_str = str(e)
         if "is_trained" in error_str or "IndexIVFFlat" in error_str or "training" in error_str.lower():
             print(f"⚠️  FAISS IVF training failed: {e}")
-            print(f"🔄 Auto-switching to Flat index for compatibility...")
+            print("🔄 Auto-switching to Flat index for compatibility...")
 
             # Override config to use Flat index
             original_index_type = encoder.config["index"]["type"]
@@ -100,7 +99,7 @@ def create_memory_with_fallback(encoder, video_path, index_path):
                 # Recreate the index manager with Flat index
                 encoder._setup_index()
                 build_stats = encoder.build_video(str(video_path), str(index_path))
-                print(f"✅ Successfully created memory using Flat index")
+                print("✅ Successfully created memory using Flat index")
                 return build_stats
             except Exception as fallback_error:
                 print(f"❌ Fallback also failed: {fallback_error}")
@@ -193,7 +192,7 @@ def create_memory_from_files(files, output_dir, memory_name, **config_overrides)
             continue
 
     processing_time = time.time() - start_time
-    print(f"\n📊 Processing Summary:")
+    print("\n📊 Processing Summary:")
     print(f"  ✅ Successfully processed: {processed_count} files")
     print(f"  ⚠️  Skipped: {skipped_count} files")
     print(f"  ⏱️  Processing time: {processing_time:.2f} seconds")
@@ -217,7 +216,7 @@ def create_memory_from_files(files, output_dir, memory_name, **config_overrides)
     total_time = time.time() - start_time
 
     # Enhanced statistics
-    print(f"\n🎉 Memory created successfully!")
+    print("\n🎉 Memory created successfully!")
     print(f"  📁 Video: {video_path}")
     print(f"  📋 Index: {index_path}")
     print(f"  📊 Chunks: {build_stats.get('total_chunks', 'unknown')}")
@@ -331,7 +330,7 @@ def load_existing_memory(memory_path):
     video_size_mb = video_path.stat().st_size / (1024 * 1024)
     print(f"✅ Video file: {video_size_mb:.1f} MB")
 
-    print(f"Loading existing memory:")
+    print("Loading existing memory:")
     print(f"  📁 Video: {video_path}")
     print(f"  📋 Index: {index_path}")
 
@@ -514,7 +513,7 @@ def main():
             # Show what defaults are being used if no overrides provided
             if not config_overrides:
                 default_config = get_default_config()
-                print(f"📋 Using default configuration:")
+                print("📋 Using default configuration:")
                 print(f"   Chunk size: {default_config['chunking']['chunk_size']}")
                 print(f"   Overlap: {default_config['chunking']['overlap']}")
                 print(f"   Index type: {default_config['index']['type']}")

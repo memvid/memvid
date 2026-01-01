@@ -3,10 +3,8 @@ DockerManager - Comprehensive Docker backend management for Memvid
 Handles all Docker complexity so encoder.py can focus on encoding logic.
 """
 
-import os
 import json
 import subprocess
-import tempfile
 import shutil
 import logging
 from pathlib import Path

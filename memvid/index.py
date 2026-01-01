@@ -9,8 +9,6 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Tuple, Optional
 import logging
 from pathlib import Path
-import pickle
-from tqdm import tqdm
 
 from .config import get_default_config
 
@@ -248,18 +246,18 @@ class IndexManager:
                     # Check if we have enough data for training
                     if len(embeddings) < nlist:
                         logger.warning(f"❌ Insufficient training data: need at least {nlist} embeddings, got {len(embeddings)}")
-                        logger.warning(f"💡 IVF indexes require more data. For single documents, consider using 'Flat' index type in config.")
-                        logger.info(f"🔄 Auto-switching to IndexFlatL2 for reliable operation")
+                        logger.warning("💡 IVF indexes require more data. For single documents, consider using 'Flat' index type in config.")
+                        logger.info("🔄 Auto-switching to IndexFlatL2 for reliable operation")
                         # Replace with flat index
                         self.index = faiss.IndexIDMap(faiss.IndexFlatL2(self.dimension))
-                        logger.info(f"✅ Switched to Flat index (exact search, slower but works with any dataset size)")
+                        logger.info("✅ Switched to Flat index (exact search, slower but works with any dataset size)")
                     else:
                         recommended_min = nlist * 10  # IVF works better with 10x+ the nlist size
                         if len(embeddings) < recommended_min:
                             logger.warning(f"⚠️ Suboptimal training data: {len(embeddings)} embeddings (recommended: {recommended_min}+)")
-                            logger.warning(f"💡 Consider using larger dataset or 'Flat' index for better results")
+                            logger.warning("💡 Consider using larger dataset or 'Flat' index for better results")
 
-                        logger.info(f"🏋️ Training FAISS IVF index...")
+                        logger.info("🏋️ Training FAISS IVF index...")
                         logger.info(f"   - Training vectors: {len(embeddings)}")
                         logger.info(f"   - Clusters (nlist): {nlist}")
                         logger.info(f"   - Expected memory: ~{(len(embeddings) * self.dimension * 4) / 1024 / 1024:.1f} MB")
@@ -276,11 +274,11 @@ class IndexManager:
         except Exception as e:
             logger.error(f"❌ Index training failed with error: {e}")
             logger.error(f"🔍 Error type: {type(e).__name__}")
-            logger.info(f"🔄 Falling back to IndexFlatL2 for reliability")
-            logger.info(f"💡 To avoid this fallback, use 'Flat' index type in config for small datasets")
+            logger.info("🔄 Falling back to IndexFlatL2 for reliability")
+            logger.info("💡 To avoid this fallback, use 'Flat' index type in config for small datasets")
             # Fallback to simple flat index
             self.index = faiss.IndexIDMap(faiss.IndexFlatL2(self.dimension))
-            logger.info(f"✅ Fallback complete - using exact search")
+            logger.info("✅ Fallback complete - using exact search")
 
         # Add to index
         try:
