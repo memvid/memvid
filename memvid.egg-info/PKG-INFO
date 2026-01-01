@@ -1,8 +1,8 @@
 Metadata-Version: 2.4
 Name: memvid
-Version: 0.1.3
+Version: 0.1.4
 Summary: Video-based AI memory library for fast semantic search and retrieval
-Home-page: https://github.com/olow304/memvid
+Home-page: https://github.com/danielsimonjr/memvid
 Author: Saleban Olow
 Author-email: olow30@gmail.com
 Classifier: Development Status :: 3 - Alpha
@@ -23,7 +23,7 @@ Requires-Dist: qrcode[pil]>=7.3
 Requires-Dist: opencv-python>=4.5.0
 Requires-Dist: opencv-contrib-python>=4.5.0
 Requires-Dist: sentence-transformers>=2.2.0
-Requires-Dist: numpy<2.0.0,>=1.21.0
+Requires-Dist: numpy>=1.21.0
 Requires-Dist: tqdm>=4.50.0
 Requires-Dist: faiss-cpu>=1.7.0
 Requires-Dist: Pillow>=9.0.0
@@ -150,7 +150,7 @@ pip install PyPDF2
 from memvid import MemvidEncoder, MemvidChat
 
 # Create video memory from text chunks
-chunks = ["Important fact 1", "Important fact 2", "Historical event details", ...]
+chunks = ["Important fact 1", "Important fact 2", "Historical event details"]
 encoder = MemvidEncoder()
 encoder.add_chunks(chunks)
 encoder.build_video("memory.mp4", "memory_index.json")

@@ -230,6 +230,32 @@ def batch_extract_and_decode(video_path: str, frame_numbers: List[int],
     return result
 
 
+
+def generate_qr_frame_worker(args: Tuple[int, str, str]) -> int:
+    """
+    Worker function for parallel QR frame generation (multiprocessing)
+    WARNING: On Windows, only use for VERY large workloads (500+ chunks)
+    due to process spawn overhead.
+    
+    Args:
+        args: Tuple of (frame_num, chunk, frames_dir_str)
+    
+    Returns:
+        frame_num: Completed frame number
+    """
+    frame_num, chunk, frames_dir_str = args
+    
+    # Import here to ensure each process has its own imports
+    import json
+    from pathlib import Path
+    
+    frames_dir = Path(frames_dir_str)
+    chunk_data = {"id": frame_num, "text": chunk, "frame": frame_num}
+    qr_image = encode_to_qr(json.dumps(chunk_data))
+    frame_path = frames_dir / f"frame_{frame_num:06d}.png"
+    qr_image.save(frame_path)
+    return frame_num
+
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
     """
     Split text into overlapping chunks
