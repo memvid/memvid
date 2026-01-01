@@ -7,8 +7,8 @@ from typing import Dict, Any
 # QR Code settings
 QR_VERSION = 35 # 1-40, higher = more data capacity https://www.qrcode.com/en/about/version.html
 QR_ERROR_CORRECTION = 'M'  # L, M, Q, H
-QR_BOX_SIZE = 5    # QR_BOX_SIZE * QR_VERSION dimensions (1 = 21 x 21, 20 = 97 x 97, 40 = 177×177) + QR_BORDER must be < frame height/width
-QR_BORDER = 3
+QR_BOX_SIZE = 3    # Optimized: 3x3 pixels per module (was 5) for better frame utilization
+QR_BORDER = 1      # Optimized: 1 module border (was 3) to maximize data density
 QR_FILL_COLOR = "black"
 QR_BACK_COLOR = "white"
 
