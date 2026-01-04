@@ -38,6 +38,7 @@ Provides-Extra: llm
 Requires-Dist: openai>=1.0.0; extra == "llm"
 Requires-Dist: google-generativeai>=0.8.0; extra == "llm"
 Requires-Dist: anthropic>=0.52.0; extra == "llm"
+Requires-Dist: huggingface_hub>=0.32.0; extra == "llm"
 Provides-Extra: epub
 Requires-Dist: beautifulsoup4>=4.0.0; extra == "epub"
 Requires-Dist: ebooklib>=0.18; extra == "epub"
@@ -150,7 +151,7 @@ pip install PyPDF2
 from memvid import MemvidEncoder, MemvidChat
 
 # Create video memory from text chunks
-chunks = ["Important fact 1", "Important fact 2", "Historical event details", ...]
+chunks = ["Important fact 1", "Important fact 2", "Historical event details"]
 encoder = MemvidEncoder()
 encoder.add_chunks(chunks)
 encoder.build_video("memory.mp4", "memory_index.json")
