@@ -249,7 +249,7 @@ pub fn ssh_similarity(a: &[f32], b: &[f32], t_a: f32, t_b: f32) -> f32 {
         return 0.0;
     }
 
-    let n = a.len();
+    let _n = a.len();
 
     // Compute SSH "spectrum" for each embedding
     // Using simplified tridiagonal eigenvalue approximation

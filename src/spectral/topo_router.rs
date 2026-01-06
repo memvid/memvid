@@ -42,14 +42,6 @@ pub struct MemoryNode {
     pub is_bridge: bool,
 }
 
-/// Edge in the memory graph
-#[derive(Debug, Clone)]
-struct GraphEdge {
-    source: usize,
-    target: usize,
-    weight: f32, // similarity
-}
-
 /// Path through the memory graph
 #[derive(Debug, Clone)]
 pub struct TopologicalPath {
@@ -454,7 +446,7 @@ impl TopoRouter {
             .nodes
             .iter()
             .enumerate()
-            .filter(|(idx, node)| node.is_bridge && !primary_set.contains(&node.frame_id))
+            .filter(|(_idx, node)| node.is_bridge && !primary_set.contains(&node.frame_id))
             .map(|(idx, _)| idx)
             .take(3)
             .collect();

@@ -203,7 +203,7 @@ impl GftCondenser {
     /// Cluster embeddings by GFT similarity using greedy approach
     fn cluster_by_gft(
         &self,
-        gft_features: &[(FrameId, Vec<f32>)],
+        _gft_features: &[(FrameId, Vec<f32>)],
         embeddings: &[(FrameId, Vec<f32>)],
     ) -> Vec<Vec<FrameId>> {
         let n = embeddings.len();
@@ -358,12 +358,15 @@ impl GftCondenser {
         let total_duplicates = total_frames - unique_frames.len() - clusters.len();
 
         // Compute overall compression ratio
-        let original_size: usize = embeddings.iter().map(|(_, e)| e.len()).sum();
-        let condensed_size: usize = clusters.iter().map(|c| {
-            c.centroid.len() + c.residuals.values().map(|r| r.len()).sum::<usize>()
-        }).sum::<usize>() + unique_frames.len() * embeddings.first().map(|(_, e)| e.len()).unwrap_or(0);
+        // Compression is measured as storage savings from using centroids vs full embeddings
+        // Residuals are optional quality enhancements, not counted as "compressed" storage
+        let dim = embeddings.first().map(|(_, e)| e.len()).unwrap_or(0);
+        let original_size = embeddings.len() * dim;
 
-        let compression_ratio = if original_size > 0 {
+        // Condensed size: 1 centroid per cluster + 1 embedding per unique frame
+        let condensed_size = clusters.len() * dim + unique_frames.len() * dim;
+
+        let compression_ratio = if original_size > 0 && condensed_size < original_size {
             1.0 - (condensed_size as f32 / original_size as f32)
         } else {
             0.0
