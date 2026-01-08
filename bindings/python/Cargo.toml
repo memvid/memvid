@@ -1,0 +1,14 @@
+[package]
+name = "memvid-python"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Python bindings for memvid-core"
+
+[lib]
+crate-type = ["cdylib"]
+name = "memvid_sdk"
+
+[dependencies]
+memvid-core = { path = "../..", features = ["lex"] }
+pyo3 = { version = "0.23", features = ["extension-module"] }

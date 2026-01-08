@@ -1,0 +1,20 @@
+[package]
+name = "memvid-node"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Node.js bindings for memvid-core"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+memvid-core = { path = "../..", features = ["lex"] }
+napi = { version = "2", features = ["async"] }
+napi-derive = "2"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
