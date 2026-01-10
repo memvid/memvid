@@ -38,6 +38,10 @@ pub mod triplet;
 // Graph-aware search for hybrid retrieval
 pub mod graph_search;
 
+// ResonantQ Spectral Enhancements
+// Provides: spectral compression, SSH topological search, caching, routing, deduplication
+pub mod spectral;
+
 // CLIP module is always compiled (for ClipIndexManifest serde compatibility)
 // but ClipModel/inference requires the "clip" feature
 pub mod clip;
@@ -176,6 +180,22 @@ pub use enrich::{EnrichmentContext, EnrichmentEngine, EnrichmentResult, RulesEng
 pub use triplet::{ExtractionMode, ExtractionStats, TripletExtractor};
 // Graph-aware search for hybrid retrieval
 pub use graph_search::{GraphMatcher, QueryPlanner, hybrid_search};
+// ResonantQ Spectral Enhancements
+pub use spectral::{
+    // Compression
+    SpectralCompressor, SpectralBasis, CompressedEmbedding,
+    compress_embedding, decompress_embedding, DEFAULT_K_MODES, OPTIMAL_K_MODES,
+    // SSH Topological Search
+    SshSearcher, SshConfig, TopologicalSearchHit,
+    ssh_similarity, dimerization_parameter,
+    // Caching
+    SpectralCache, CacheStats, CachedBasis,
+    // TopoRouter
+    TopoRouter, RouteResult, MemoryNode, TopologicalPath,
+    // GFT Deduplication
+    GftCondenser, CondensedMemory, DuplicateCluster,
+    compute_gft, inverse_gft,
+};
 // Embedding provider types for vector embedding generation
 pub use types::{
     BatchEmbeddingResult, EmbeddingConfig, EmbeddingProvider, EmbeddingProviderKind,

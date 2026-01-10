@@ -120,3 +120,8 @@ symspell_cleanup = ["dep:symspell"]
 [dev-dependencies]
 fastrand = "2.0"
 tempfile = "3.10.1"
+
+# ResonantQ Spectral Enhancement Benchmarks
+[[bench]]
+name = "spectral_benchmark"
+harness = false
