@@ -44,6 +44,7 @@ fn doctor_rebuilds_tantivy_index() {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -90,6 +91,7 @@ fn doctor_rebuilds_tantivy_index() {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -226,6 +228,7 @@ fn open_file_with_tantivy_segments_enables_lex() {
     {
         let mut mem = Memvid::open_read_only(path).unwrap();
         let result = mem.search(SearchRequest {
+            frames: Vec::new(),
             query: "test".to_string(),
             top_k: 10,
             snippet_chars: 200,
@@ -314,6 +317,7 @@ fn doctor_rebuild_produces_searchable_index() {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -341,6 +345,7 @@ fn doctor_rebuild_produces_searchable_index() {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]

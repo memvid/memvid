@@ -591,6 +591,7 @@ mod tests {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -610,6 +611,7 @@ mod tests {
                 top_k: 10,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -681,6 +683,7 @@ mod tests {
                     top_k: 5,
                     snippet_chars: 160,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]
@@ -742,6 +745,7 @@ mod tests {
                     top_k: 5,
                     snippet_chars: 160,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]
@@ -826,6 +830,7 @@ mod tests {
                     top_k: 10,
                     snippet_chars: 120,
                     uri: Some("mv2://docs/pricing.md".into()),
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]
@@ -849,6 +854,7 @@ mod tests {
                     top_k: 10,
                     snippet_chars: 120,
                     uri: None,
+                    frames: Vec::new(),
                     scope: Some("mv2://docs/".into()),
                     cursor: None,
                     #[cfg(feature = "temporal_track")]
@@ -902,6 +908,7 @@ mod tests {
                     top_k: 1,
                     snippet_chars: 90,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]
@@ -925,6 +932,7 @@ mod tests {
                     top_k: 1,
                     snippet_chars: 90,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: Some(cursor),
                     #[cfg(feature = "temporal_track")]
@@ -966,6 +974,7 @@ mod tests {
                     top_k: 5,
                     snippet_chars: 120,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]

@@ -61,6 +61,7 @@ mod tests {
                         top_k: 10,
                         snippet_chars: 200,
                         uri: None,
+                        frames: Vec::new(),
                         scope: None,
                         cursor: None,
                         #[cfg(feature = "temporal_track")]

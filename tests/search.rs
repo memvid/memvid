@@ -69,6 +69,7 @@ fn search_basic_query() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -104,6 +105,7 @@ fn search_multiple_results() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -156,6 +158,7 @@ fn search_respects_top_k() {
             top_k: 5,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -187,6 +190,7 @@ fn search_with_scope() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: Some("mv2://physics/".to_string()),
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -222,6 +226,7 @@ fn search_returns_snippets() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -255,6 +260,7 @@ fn search_no_results() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -288,6 +294,7 @@ fn search_empty_memory() {
             top_k: 10,
             snippet_chars: 200,
             uri: None,
+            frames: Vec::new(),
             scope: None,
             cursor: None,
             #[cfg(feature = "temporal_track")]
@@ -302,6 +309,132 @@ fn search_empty_memory() {
         results.hits.len(),
         0,
         "Empty memory should return no results"
+    );
+}
+
+/// Test search with frame ID filtering.
+#[test]
+#[cfg(feature = "lex")]
+fn search_with_frame_filter() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.mv2");
+
+    // Create memory
+    {
+        let mut mem = Memvid::create(&path).unwrap();
+        mem.enable_lex().unwrap();
+
+        let docs = vec![
+            ("mv2://doc1", "Document 1", "This is the first document about physics"),
+            ("mv2://doc2", "Document 2", "This is the second document about chemistry"),
+            ("mv2://doc3", "Document 3", "This is the third document about biology"),
+        ];
+
+        for (uri, title, content) in docs {
+            let opts = PutOptions {
+                uri: Some(uri.to_string()),
+                title: Some(title.to_string()),
+                search_text: Some(content.to_string()),
+                ..Default::default()
+            };
+            mem.put_bytes_with_options(content.as_bytes(), opts)
+                .unwrap();
+        }
+        mem.commit().unwrap();
+    }
+
+    let mut mem = Memvid::open(&path).unwrap();
+    mem.enable_lex().unwrap();
+
+    // Search without frame filter - should find all documents
+    let all_results = mem
+        .search(SearchRequest {
+            query: "document".to_string(),
+            top_k: 10,
+            snippet_chars: 200,
+            uri: None,
+            frames: Vec::new(),
+            scope: None,
+            cursor: None,
+            #[cfg(feature = "temporal_track")]
+            temporal: None,
+            as_of_frame: None,
+            as_of_ts: None,
+            no_sketch: false,
+        })
+        .unwrap();
+    assert_eq!(all_results.hits.len(), 3, "Should find all 3 documents");
+    
+    // Extract frame IDs from search results (these are the actual frame IDs in the TOC)
+    let all_frame_ids: Vec<_> = all_results.hits.iter().map(|h| h.frame_id).collect();
+    println!("All frame IDs from search: {:?}", all_frame_ids);
+    
+    // Find frame IDs for doc1 (physics) and doc3 (biology)
+    let doc1_frame_id = all_results.hits.iter()
+        .find(|h| h.uri == "mv2://doc1")
+        .map(|h| h.frame_id)
+        .expect("Should find doc1");
+    let doc3_frame_id = all_results.hits.iter()
+        .find(|h| h.uri == "mv2://doc3")
+        .map(|h| h.frame_id)
+        .expect("Should find doc3");
+    
+    // Search with frame filter - only first and third document
+    let filtered_results = mem
+        .search(SearchRequest {
+            query: "document".to_string(),
+            top_k: 10,
+            snippet_chars: 200,
+            uri: None,
+            frames: vec![doc1_frame_id, doc3_frame_id],
+            scope: None,
+            cursor: None,
+            #[cfg(feature = "temporal_track")]
+            temporal: None,
+            as_of_frame: None,
+            as_of_ts: None,
+            no_sketch: false,
+        })
+        .unwrap();
+
+    // Should find only doc1 and doc3, not doc2
+    let result_frame_ids: Vec<_> = filtered_results
+        .hits
+        .iter()
+        .map(|h| h.frame_id)
+        .collect();
+    
+    println!("Filtered result frame IDs: {:?}", result_frame_ids);
+    
+    // Verify doc1 (physics) is included
+    assert!(
+        result_frame_ids.contains(&doc1_frame_id),
+        "Should include doc1 (physics), got: {:?}",
+        result_frame_ids
+    );
+    // Verify doc3 (biology) is included  
+    assert!(
+        result_frame_ids.contains(&doc3_frame_id),
+        "Should include doc3 (biology), got: {:?}",
+        result_frame_ids
+    );
+    // Verify doc2 (chemistry) is NOT included
+    let doc2_frame_id = all_results.hits.iter()
+        .find(|h| h.uri == "mv2://doc2")
+        .map(|h| h.frame_id)
+        .expect("Should find doc2");
+    assert!(
+        !result_frame_ids.contains(&doc2_frame_id),
+        "Should not include doc2 (chemistry), got: {:?}",
+        result_frame_ids
+    );
+    
+    // Should have exactly 2 results
+    assert_eq!(
+        filtered_results.hits.len(),
+        2,
+        "Should find exactly 2 documents (doc1 and doc3), got {}",
+        filtered_results.hits.len()
     );
 }
 

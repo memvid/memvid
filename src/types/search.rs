@@ -47,6 +47,9 @@ pub struct SearchRequest {
     #[serde(default)]
     /// Restrict search to a specific URI.
     pub uri: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Restrict search to specific frame IDs.
+    pub frames: Vec<FrameId>,
     #[serde(default)]
     /// Restrict search to a named scope/collection.
     pub scope: Option<String>,

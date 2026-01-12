@@ -49,6 +49,9 @@ pub struct AskRequest {
     pub snippet_chars: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Restrict search to specific frame IDs.
+    pub frames: Vec<FrameId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

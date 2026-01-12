@@ -318,6 +318,7 @@ pub fn hybrid_search(memvid: &mut Memvid, plan: &QueryPlan) -> Result<Vec<Hybrid
                 top_k: *top_k,
                 snippet_chars: 200,
                 uri: None,
+                frames: Vec::new(),
                 scope: None,
                 cursor: None,
                 #[cfg(feature = "temporal_track")]
@@ -382,6 +383,7 @@ pub fn hybrid_search(memvid: &mut Memvid, plan: &QueryPlan) -> Result<Vec<Hybrid
                     top_k: *top_k,
                     snippet_chars: 200,
                     uri: None,
+                    frames: Vec::new(),
                     scope: None,
                     cursor: None,
                     #[cfg(feature = "temporal_track")]

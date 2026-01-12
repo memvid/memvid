@@ -60,6 +60,7 @@ impl Memvid {
             top_k,
             snippet_chars,
             uri: None,
+            frames: Vec::new(),
             scope: opts.scope.clone(),
             cursor: None,
             start: opts.start,

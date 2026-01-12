@@ -101,6 +101,7 @@ fn main() -> Result<()> {
 
     for query in queries {
         let request = SearchRequest {
+            frames: Vec::new(),
             query: query.to_string(),
             top_k: 3,
             snippet_chars: 150,

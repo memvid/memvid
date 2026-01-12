@@ -90,6 +90,7 @@ fn main() -> Result<()> {
         top_k: 10,
         snippet_chars: 200,
         uri: None,
+        frames: Vec::new(),
         scope: None,
         cursor: None,
         #[cfg(feature = "temporal_track")]
@@ -119,6 +120,7 @@ fn main() -> Result<()> {
         top_k: 10,
         snippet_chars: 100,
         uri: None,
+        frames: Vec::new(),
         scope: Some("mv2://docs/".to_string()),
         cursor: None,
         #[cfg(feature = "temporal_track")]

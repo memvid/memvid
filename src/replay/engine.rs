@@ -228,6 +228,7 @@ impl<'a> ReplayEngine<'a> {
                             top_k: replay_top_k,
                             snippet_chars: 120,
                             uri: None,
+                            frames: Vec::new(),
                             scope: None,
                             cursor: None,
                             #[cfg(feature = "temporal_track")]

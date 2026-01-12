@@ -179,6 +179,30 @@ impl Memvid {
             };
         }
 
+        // FRAME FILTER: Filter by specific frame IDs if provided
+        if !request.frames.is_empty() {
+            let frames_set: HashSet<FrameId> = request.frames.iter().copied().collect();
+            candidate_filter = match candidate_filter {
+                Some(existing) => {
+                    let filtered: HashSet<FrameId> = existing
+                        .into_iter()
+                        .filter(|id| frames_set.contains(id))
+                        .collect();
+                    if filtered.is_empty() {
+                        let elapsed = start_time.elapsed().as_millis();
+                        return Ok(empty_search_response(
+                            request.query.clone(),
+                            params.clone(),
+                            elapsed,
+                            SearchEngineKind::Tantivy,
+                        ));
+                    }
+                    Some(filtered)
+                }
+                None => Some(frames_set),
+            };
+        }
+
         // SKETCH PRE-FILTER: Use sketch track for fast candidate generation if available
         // This dramatically reduces the number of documents sent to BM25/Tantivy
         if self.has_sketches() && has_text_terms && !request.no_sketch {
