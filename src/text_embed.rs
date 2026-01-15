@@ -26,7 +26,7 @@
 use crate::types::embedding::EmbeddingProvider;
 use crate::{MemvidError, Result};
 use ndarray::Array;
-use ort::session::{Session, builder::GraphOptimizationLevel};
+use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::Tensor;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
@@ -98,8 +98,10 @@ pub static TEXT_EMBED_MODELS: &[TextEmbedModelInfo] = &[
     // Nomic: Versatile, good for various tasks (768d)
     TextEmbedModelInfo {
         name: "nomic-embed-text-v1.5",
-        model_url: "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model.onnx",
-        tokenizer_url: "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json",
+        model_url:
+            "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model.onnx",
+        tokenizer_url:
+            "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json",
         dims: 768,
         max_tokens: 512,
         is_default: false,
@@ -144,8 +146,13 @@ pub struct TextEmbedConfig {
     pub model_name: String,
     /// Directory to store/load ONNX models and tokenizers
     pub models_dir: PathBuf,
-    /// Offline mode - don't attempt downloads, fail if model missing
-    pub offline: bool,
+    /// Whether to automatically download models if missing.
+    ///
+    /// When `true`, models will be downloaded from HuggingFace on first use.
+    /// When `false`, you must download models manually.
+    ///
+    /// Default: `false` (manual download required for backward compatibility)
+    pub auto_download: bool,
     /// Enable embedding cache (default: true)
     pub enable_cache: bool,
     /// Maximum number of embeddings to cache (default: 1000)
@@ -164,9 +171,39 @@ impl Default for TextEmbedConfig {
         Self {
             model_name: default_text_model_info().name.to_string(),
             models_dir,
-            offline: true,      // Default to offline (no auto-download)
-            enable_cache: true, // Cache enabled by default
+            auto_download: false, // Default: manual downloads (backward compatible)
+            enable_cache: true,   // Cache enabled by default
             cache_capacity: DEFAULT_CACHE_CAPACITY,
+        }
+    }
+}
+
+impl TextEmbedConfig {
+    /// Create a config with automatic model downloads enabled.
+    ///
+    /// Models will be downloaded from HuggingFace on first use if not already cached.
+    /// Subsequent runs will use the cached models.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let config = TextEmbedConfig::with_auto_download();
+    /// let embedder = LocalTextEmbedder::new(config)?;
+    /// // ↑ Downloads ~133MB BGE-small model on first use
+    /// ```
+    pub fn with_auto_download() -> Self {
+        Self {
+            auto_download: true,
+            ..Default::default()
+        }
+    }
+
+    /// Create a config for offline use (manual downloads required).
+    ///
+    /// This is the default behavior. You must download models manually.
+    pub fn offline() -> Self {
+        Self {
+            auto_download: false,
+            ..Default::default()
         }
     }
 }
@@ -370,23 +407,65 @@ impl LocalTextEmbedder {
         let filename = format!("{}.onnx", self.model_info.name);
         let path = self.config.models_dir.join(&filename);
 
+        // Check if file already exists and is valid
         if path.exists() {
-            return Ok(path);
+            let metadata = std::fs::metadata(&path).map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to read model file metadata: {}", e).into(),
+            })?;
+
+            if metadata.len() < 1_000_000 {
+                tracing::warn!(
+                    path = ?path,
+                    size = metadata.len(),
+                    "Model file seems corrupted (too small)"
+                );
+            } else {
+                return Ok(path);
+            }
         }
 
-        // Model file doesn't exist
-        Err(MemvidError::EmbeddingFailed {
-            reason: format!(
-                "Text embedding model not found at {}. Please download manually:\n\
-                 mkdir -p {}\n\
-                 curl -L '{}' -o '{}'",
-                path.display(),
-                self.config.models_dir.display(),
-                self.model_info.model_url,
-                path.display()
-            )
-            .into(),
-        })
+        // File doesn't exist or is corrupted
+        if !self.config.auto_download {
+            return Err(MemvidError::EmbeddingFailed {
+                reason: format!(
+                    "Text embedding model not found at {}.
+\
+                     To download manually:
+\
+                     mkdir -p {}
+\
+                     curl -L '{}' -o '{}'
+
+\
+                     Or enable automatic downloads:
+\
+                     TextEmbedConfig::with_auto_download()",
+                    path.display(),
+                    self.config.models_dir.display(),
+                    self.model_info.model_url,
+                    path.display()
+                )
+                .into(),
+            });
+        }
+
+        // Auto-download enabled
+        #[cfg(feature = "vec")]
+        {
+            tracing::info!(
+                model = self.model_info.name,
+                url = self.model_info.model_url,
+                "Downloading model (this may take a few minutes)..."
+            );
+
+            download::download_file(self.model_info.model_url, &path, None)?;
+            Ok(path)
+        }
+
+        #[cfg(not(feature = "vec"))]
+        {
+            unreachable!("auto_download requires vec feature");
+        }
     }
 
     /// Ensure tokenizer file exists, returning error with download instructions if not
@@ -394,21 +473,62 @@ impl LocalTextEmbedder {
         let filename = format!("{}_tokenizer.json", self.model_info.name);
         let path = self.config.models_dir.join(&filename);
 
+        // Check if file already exists and is valid
         if path.exists() {
-            return Ok(path);
+            let metadata = std::fs::metadata(&path).map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to read tokenizer metadata: {}", e).into(),
+            })?;
+
+            if metadata.len() > 10_000 {
+                return Ok(path);
+            }
+
+            tracing::warn!(
+                path = ?path,
+                size = metadata.len(),
+                "Tokenizer file seems corrupted"
+            );
         }
 
-        // Tokenizer file doesn't exist
-        Err(MemvidError::EmbeddingFailed {
-            reason: format!(
-                "Tokenizer not found at {}. Please download manually:\n\
-                 curl -L '{}' -o '{}'",
-                path.display(),
-                self.model_info.tokenizer_url,
-                path.display()
-            )
-            .into(),
-        })
+        // File doesn't exist or is corrupted
+        if !self.config.auto_download {
+            return Err(MemvidError::EmbeddingFailed {
+                reason: format!(
+                    "Tokenizer not found at {}.
+\
+                     To download manually:
+\
+                     curl -L '{}' -o '{}'
+
+\
+                     Or enable automatic downloads:
+\
+                     TextEmbedConfig::with_auto_download()",
+                    path.display(),
+                    self.model_info.tokenizer_url,
+                    path.display()
+                )
+                .into(),
+            });
+        }
+
+        // Auto-download enabled
+        #[cfg(feature = "vec")]
+        {
+            tracing::info!(
+                tokenizer = self.model_info.name,
+                url = self.model_info.tokenizer_url,
+                "Downloading tokenizer..."
+            );
+
+            download::download_file(self.model_info.tokenizer_url, &path, None)?;
+            Ok(path)
+        }
+
+        #[cfg(not(feature = "vec"))]
+        {
+            unreachable!("auto_download requires vec feature");
+        }
     }
 
     /// Load ONNX session lazily
@@ -821,6 +941,157 @@ fn l2_normalize(v: &[f32]) -> Vec<f32> {
 }
 
 // ============================================================================
+// Model Download Module
+// ============================================================================
+
+#[cfg(feature = "vec")]
+mod download {
+    use super::*;
+    use std::io::Write;
+    use std::path::Path;
+
+    /// Download a file from URL to destination with atomic write and verification
+    ///
+    /// This function:
+    /// - Downloads to a temporary file first
+    /// - Shows progress logging
+    /// - Verifies file size
+    /// - Performs atomic rename on success
+    /// - Cleans up on failure
+    pub fn download_file(url: &str, dest: &Path, expected_size: Option<u64>) -> Result<()> {
+        tracing::info!(url = url, dest = ?dest, "Downloading model file");
+
+        // Create parent directory if needed
+        if let Some(parent) = dest.parent() {
+            fs_err::create_dir_all(parent).map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to create models directory: {}", e).into(),
+            })?;
+        }
+
+        // Download to temporary file first (atomic download)
+        let temp_path = dest.with_extension("download");
+
+        // Clean up any previous failed download
+        let _ = std::fs::remove_file(&temp_path);
+
+        // Perform HTTP GET request
+        let response = reqwest::blocking::get(url).map_err(|e| MemvidError::EmbeddingFailed {
+            reason: format!("Failed to download from {}: {}", url, e).into(),
+        })?;
+
+        // Check HTTP status
+        if !response.status().is_success() {
+            return Err(MemvidError::EmbeddingFailed {
+                reason: format!("Download failed with HTTP status: {}", response.status()).into(),
+            });
+        }
+
+        // Get content length for progress tracking
+        let content_length = response.content_length();
+        if let (Some(expected), Some(actual)) = (expected_size, content_length) {
+            if expected != actual {
+                tracing::warn!(
+                    expected = expected,
+                    actual = actual,
+                    "Content length mismatch (may indicate model update)"
+                );
+            }
+        }
+
+        // Stream to temp file with progress logging
+        let total_size = content_length.unwrap_or(0);
+        let mut downloaded = 0u64;
+        let mut last_progress = 0u8;
+
+        let mut file =
+            fs_err::File::create(&temp_path).map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to create temp file: {}", e).into(),
+            })?;
+
+        let mut reader = std::io::BufReader::new(response);
+        let mut buffer = vec![0; 8192];
+
+        loop {
+            let bytes_read = std::io::Read::read(&mut reader, &mut buffer).map_err(|e| {
+                MemvidError::EmbeddingFailed {
+                    reason: format!("Download interrupted: {}", e).into(),
+                }
+            })?;
+
+            if bytes_read == 0 {
+                break;
+            }
+
+            file.write_all(&buffer[..bytes_read])
+                .map_err(|e| MemvidError::EmbeddingFailed {
+                    reason: format!("Failed to write to temp file: {}", e).into(),
+                })?;
+
+            downloaded += bytes_read as u64;
+
+            // Show progress every 10%
+            if total_size > 0 {
+                let progress = ((downloaded * 100) / total_size) as u8;
+                if progress >= last_progress + 10 {
+                    tracing::info!(
+                        downloaded_mb = downloaded / 1_048_576,
+                        total_mb = total_size / 1_048_576,
+                        progress_pct = progress,
+                        "Download progress"
+                    );
+                    last_progress = progress;
+                }
+            }
+        }
+
+        // Flush and sync to ensure all data is written
+        file.flush().map_err(|e| MemvidError::EmbeddingFailed {
+            reason: format!("Failed to flush temp file: {}", e).into(),
+        })?;
+
+        file.sync_all().map_err(|e| MemvidError::EmbeddingFailed {
+            reason: format!("Failed to sync temp file: {}", e).into(),
+        })?;
+
+        drop(file); // Close file before rename
+
+        // Verify file size
+        let downloaded_size = std::fs::metadata(&temp_path)
+            .map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to verify download: {}", e).into(),
+            })?
+            .len();
+
+        if let Some(expected) = content_length {
+            if downloaded_size != expected {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(MemvidError::EmbeddingFailed {
+                    reason: format!(
+                        "Download incomplete: got {} bytes, expected {}",
+                        downloaded_size, expected
+                    )
+                    .into(),
+                });
+            }
+        }
+
+        tracing::info!(
+            size_mb = downloaded_size / 1_048_576,
+            "Download complete, moving to final location"
+        );
+
+        // Atomic rename (crash-safe)
+        fs_err::rename(&temp_path, dest).map_err(|e| MemvidError::EmbeddingFailed {
+            reason: format!("Failed to move downloaded file: {}", e).into(),
+        })?;
+
+        tracing::info!(dest = ?dest, "Model file ready");
+
+        Ok(())
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -861,7 +1132,7 @@ mod tests {
     fn test_config_defaults() {
         let config = TextEmbedConfig::default();
         assert_eq!(config.model_name, "bge-small-en-v1.5");
-        assert!(config.offline);
+        assert!(!config.auto_download); // Default is manual downloads
 
         let bge_small = TextEmbedConfig::bge_small();
         assert_eq!(bge_small.model_name, "bge-small-en-v1.5");

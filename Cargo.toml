@@ -65,6 +65,8 @@ image = { version = "0.25", optional = true, default-features = false, features 
 ndarray = { version = "0.16", optional = true }
 rayon = { version = "1.10", optional = true }
 tokenizers = { version = "0.22", optional = true }
+# HTTP client for model downloads - blocking API with pure Rust TLS
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
 symphonia = { version = "0.5.3", optional = true, default-features = false, features = ["aac", "mp3", "flac", "isomp4", "ogg", "wav", "pcm"] }
 rubato = { version = "0.15", optional = true }
 rustfft = { version = "6.2", optional = true }
@@ -95,7 +97,7 @@ extractous = ["dep:extractous"]
 pdf_extract = ["dep:pdf-extract"]
 # High-accuracy PDF extraction with perfect word spacing (recommended for 2025+)
 pdf_oxide = ["dep:pdf_oxide"]
-vec = ["dep:ort", "dep:hnsw", "dep:ndarray", "dep:tokenizers"]
+vec = ["dep:ort", "dep:hnsw", "dep:ndarray", "dep:tokenizers", "dep:reqwest"]
 clip = ["vec", "dep:image", "dep:ndarray", "dep:rayon", "dep:tokenizers"]
 mmap = []
 pdfium = ["dep:pdfium-render"]
@@ -127,4 +129,8 @@ required-features = ["vec"]
 
 [[example]]
 name = "text_embed_cache_bench"
+required-features = ["vec"]
+
+[[example]]
+name = "test_auto_download"
 required-features = ["vec"]
