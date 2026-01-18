@@ -145,6 +145,7 @@ memvid-core = "2.0"
 | `vec`               | Vector similarity search (HNSW + local text embeddings via ONNX) |
 | `clip`              | CLIP visual embeddings for image search             |
 | `whisper`           | Audio transcription with Whisper                    |
+| `api_embed`         | Cloud API embeddings (OpenAI)                       |
 | `temporal_track`    | Natural language date parsing ("last Tuesday")      |
 | `parallel_segments` | Multi-threaded ingestion                            |
 | `encryption`        | Password-based encryption capsules (.mv2e)          |
@@ -365,6 +366,48 @@ let embedder = LocalTextEmbedder::new(config)?;
 ```
 
 See `examples/text_embedding.rs` for a complete example with similarity computation and search ranking.
+
+---
+
+## API Embeddings (OpenAI)
+
+The `api_embed` feature enables cloud-based embedding generation using OpenAI's API.
+
+### Setup
+
+Set your OpenAI API key:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### Usage
+
+```rust
+use memvid_core::api_embed::{OpenAIConfig, OpenAIEmbedder};
+use memvid_core::types::embedding::EmbeddingProvider;
+
+// Use default model (text-embedding-3-small)
+let config = OpenAIConfig::default();
+let embedder = OpenAIEmbedder::new(config)?;
+
+let embedding = embedder.embed_text("hello world")?;
+assert_eq!(embedding.len(), 1536);
+
+// Use higher quality model
+let config = OpenAIConfig::large();  // text-embedding-3-large (3072 dims)
+let embedder = OpenAIEmbedder::new(config)?;
+```
+
+### Available Models
+
+| Model                      | Dimensions | Best For                    |
+| -------------------------- | ---------- | --------------------------- |
+| `text-embedding-3-small`   | 1536       | Default, fastest, cheapest  |
+| `text-embedding-3-large`   | 3072       | Highest quality             |
+| `text-embedding-ada-002`   | 1536       | Legacy model                |
+
+See `examples/openai_embedding.rs` for a complete example.
 
 ---
 

@@ -63,6 +63,10 @@ pub mod encryption;
 #[cfg(feature = "symspell_cleanup")]
 pub mod symspell_cleanup;
 
+// API-based embedding providers (OpenAI, etc.) - requires network
+#[cfg(feature = "api_embed")]
+pub mod api_embed;
+
 #[cfg(test)]
 mod tests_lex_flag;
 
@@ -200,6 +204,12 @@ pub use vec_pq::{
 pub use text_embed::{
     LocalTextEmbedder, TEXT_EMBED_MODELS, TextEmbedConfig, TextEmbedModelInfo,
     default_text_model_info, get_text_model_info,
+};
+// API-based embedding providers - feature-gated
+#[cfg(feature = "api_embed")]
+pub use api_embed::{
+    OPENAI_MODELS, OpenAIConfig, OpenAIEmbedder, OpenAIModelInfo, default_openai_model_info,
+    get_openai_model_info,
 };
 // CLIP visual embeddings - types always available for serde compatibility
 pub use clip::{

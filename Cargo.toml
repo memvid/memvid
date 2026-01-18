@@ -85,6 +85,9 @@ byteorder = { version = "1.5", optional = true }
 # SymSpell for PDF text cleanup - fixes broken word spacing from PDF extraction
 symspell = { version = "0.4", optional = true }
 
+# HTTP client for API-based embedding providers (OpenAI, etc.)
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["blocking", "json", "rustls-tls"] }
+
 [features]
 default = ["lex", "pdf_extract"]
 # pdf_oxide disabled - cff-parser panics on ligature fonts (uniFB01/uniFB02)
@@ -116,6 +119,8 @@ replay = []
 encryption = ["dep:argon2", "dep:aes-gcm", "dep:rand", "dep:zeroize"]
 # SymSpell-based PDF text cleanup - fixes broken word spacing
 symspell_cleanup = ["dep:symspell"]
+# API-based embedding providers (OpenAI, Anthropic, etc.) - requires network
+api_embed = ["dep:reqwest"]
 
 [dev-dependencies]
 fastrand = "2.0"
@@ -128,3 +133,7 @@ required-features = ["vec"]
 [[example]]
 name = "text_embed_cache_bench"
 required-features = ["vec"]
+
+[[example]]
+name = "openai_embedding"
+required-features = ["api_embed"]
