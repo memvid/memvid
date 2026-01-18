@@ -25,7 +25,6 @@
 
 use crate::types::embedding::EmbeddingProvider;
 use crate::{MemvidError, Result};
-use ndarray::Array;
 use ort::session::{Session, builder::GraphOptimizationLevel};
 use ort::value::Tensor;
 use std::collections::hash_map::DefaultHasher;
@@ -556,23 +555,20 @@ impl LocalTextEmbedder {
             .collect();
         let max_length = input_ids.len();
 
-        // Create input arrays
-        let input_ids_array = Array::from_shape_vec((1, max_length), input_ids).map_err(|e| {
-            MemvidError::EmbeddingFailed {
-                reason: format!("Failed to create input_ids array: {}", e).into(),
-            }
-        })?;
-        let attention_mask_array =
-            Array::from_shape_vec((1, max_length), attention_mask).map_err(|e| {
+        // Create input arrays using ndarray
+        let input_ids_array =
+            ndarray::Array2::from_shape_vec((1, max_length), input_ids).map_err(|e| {
                 MemvidError::EmbeddingFailed {
-                    reason: format!("Failed to create attention_mask array: {}", e).into(),
+                    reason: format!("Failed to create input_ids array: {}", e).into(),
                 }
             })?;
-        let token_type_ids_array =
-            Array::from_shape_vec((1, max_length), token_type_ids).map_err(|e| {
-                MemvidError::EmbeddingFailed {
-                    reason: format!("Failed to create token_type_ids array: {}", e).into(),
-                }
+        let attention_mask_array = ndarray::Array2::from_shape_vec((1, max_length), attention_mask)
+            .map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to create attention_mask array: {}", e).into(),
+            })?;
+        let token_type_ids_array = ndarray::Array2::from_shape_vec((1, max_length), token_type_ids)
+            .map_err(|e| MemvidError::EmbeddingFailed {
+                reason: format!("Failed to create token_type_ids array: {}", e).into(),
             })?;
 
         // Update last used timestamp
@@ -600,7 +596,7 @@ impl LocalTextEmbedder {
             .map(|o| o.name.clone())
             .unwrap_or_else(|| "last_hidden_state".to_string());
 
-        // Create tensors
+        // Create tensors from ndarray arrays
         let input_ids_tensor =
             Tensor::from_array(input_ids_array).map_err(|e| MemvidError::EmbeddingFailed {
                 reason: format!("Failed to create input_ids tensor: {}", e).into(),
