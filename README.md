@@ -286,7 +286,44 @@ cargo run --example clip_visual_search --features clip
 Audio transcription (requires `whisper` feature):
 
 ```bash
-cargo run --example test_whisper --features whisper
+cargo run --example test_whisper --features whisper -- /path/to/audio.mp3
+```
+
+**Available Models:**
+
+| Model | Size | Speed | Use Case |
+|-------|------|-------|----------|
+| `whisper-small-en` | 244 MB | Slowest | Best accuracy (default) |
+| `whisper-tiny-en` | 75 MB | Fast | Balanced |
+| `whisper-tiny-en-q8k` | 19 MB | Fastest | Quick testing, resource-constrained |
+
+**Model Selection:**
+
+```bash
+# Default (FP32 small, highest accuracy)
+cargo run --example test_whisper --features whisper -- audio.mp3
+
+# Quantized tiny (75% smaller, faster)
+MEMVID_WHISPER_MODEL=whisper-tiny-en-q8k cargo run --example test_whisper --features whisper -- audio.mp3
+```
+
+**Programmatic Configuration:**
+
+```rust
+use memvid_core::{WhisperConfig, WhisperTranscriber};
+
+// Default FP32 small model
+let config = WhisperConfig::default();
+
+// Quantized tiny model (faster, smaller)
+let config = WhisperConfig::with_quantization();
+
+// Specific model
+let config = WhisperConfig::with_model("whisper-tiny-en-q8k");
+
+let transcriber = WhisperTranscriber::new(&config)?;
+let result = transcriber.transcribe_file("audio.mp3")?;
+println!("{}", result.text);
 ```
 
 ---

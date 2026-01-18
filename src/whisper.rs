@@ -21,6 +21,23 @@ use std::path::Path;
 // Model Registry
 // ============================================================================
 
+/// Quantization type for Whisper models
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QuantizationType {
+    /// Full precision FP32 (default, highest accuracy)
+    FP32,
+    /// 8-bit quantization (~75% smaller, ~15-20% faster)
+    Q8K,
+    /// 4-bit quantization (~87.5% smaller, ~25-30% faster)
+    Q4K,
+}
+
+impl Default for QuantizationType {
+    fn default() -> Self {
+        Self::FP32
+    }
+}
+
 /// Available Whisper models with verified HuggingFace model IDs
 #[derive(Debug, Clone)]
 pub struct WhisperModelInfo {
@@ -34,16 +51,23 @@ pub struct WhisperModelInfo {
     pub is_default: bool,
     /// Language (e.g., "en" for English-only models, "multilingual" for others)
     pub language: &'static str,
+    /// Quantization type (FP32, Q8K, Q4K)
+    pub quantization: QuantizationType,
+    /// Model file format ("safetensors" for FP32, "gguf" for quantized)
+    pub file_format: &'static str,
 }
 
 /// Available Whisper models registry
 pub static WHISPER_MODELS: &[WhisperModelInfo] = &[
+    // FP32 models (default, highest accuracy)
     WhisperModelInfo {
         model_id: "openai/whisper-small.en",
         name: "whisper-small-en",
         size_mb: 244.0,
         is_default: true,
         language: "en",
+        quantization: QuantizationType::FP32,
+        file_format: "safetensors",
     },
     WhisperModelInfo {
         model_id: "openai/whisper-small",
@@ -51,6 +75,38 @@ pub static WHISPER_MODELS: &[WhisperModelInfo] = &[
         size_mb: 244.0,
         is_default: false,
         language: "multilingual",
+        quantization: QuantizationType::FP32,
+        file_format: "safetensors",
+    },
+    // Tiny FP32 models (faster, less accurate)
+    WhisperModelInfo {
+        model_id: "openai/whisper-tiny.en",
+        name: "whisper-tiny-en",
+        size_mb: 75.0,
+        is_default: false,
+        language: "en",
+        quantization: QuantizationType::FP32,
+        file_format: "safetensors",
+    },
+    // Q8K quantized tiny models (~75% smaller, faster)
+    // Uses lmz/candle-whisper quantized models from HuggingFace
+    WhisperModelInfo {
+        model_id: "lmz/candle-whisper",
+        name: "whisper-tiny-en-q8k",
+        size_mb: 19.0,
+        is_default: false,
+        language: "en",
+        quantization: QuantizationType::Q8K,
+        file_format: "gguf",
+    },
+    WhisperModelInfo {
+        model_id: "lmz/candle-whisper",
+        name: "whisper-tiny-q8k",
+        size_mb: 19.0,
+        is_default: false,
+        language: "multilingual",
+        quantization: QuantizationType::Q8K,
+        file_format: "gguf",
     },
 ];
 
@@ -107,6 +163,47 @@ impl Default for WhisperConfig {
             model_name,
             models_dir,
             offline,
+        }
+    }
+}
+
+impl WhisperConfig {
+    /// Create config with Q8K quantized tiny model (~19 MB, very fast)
+    ///
+    /// Uses lmz/candle-whisper quantized models from HuggingFace.
+    /// Trade-off: Lower accuracy than whisper-small, but much faster.
+    #[must_use]
+    pub fn with_quantization() -> Self {
+        Self {
+            model_name: "whisper-tiny-en-q8k".to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// Create config with specific model name
+    #[must_use]
+    pub fn with_model(model_name: impl Into<String>) -> Self {
+        Self {
+            model_name: model_name.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Create config for multilingual Q8K quantized tiny model
+    #[must_use]
+    pub fn multilingual_quantized() -> Self {
+        Self {
+            model_name: "whisper-tiny-q8k".to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// Create config for tiny FP32 model (75 MB, faster than small)
+    #[must_use]
+    pub fn tiny() -> Self {
+        Self {
+            model_name: "whisper-tiny-en".to_string(),
+            ..Default::default()
         }
     }
 }
@@ -331,55 +428,31 @@ mod audio {
         Ok((samples, duration_secs))
     }
 
-    /// High-quality sinc resampling using rubato
+    /// Simple linear interpolation resampling
+    /// Note: rubato 1.0 changed API to require audio_core buffer types.
+    /// Using simple linear interpolation which is sufficient for Whisper mel spectrogram input.
     fn resample_sinc(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
-        use rubato::{FftFixedIn, Resampler};
-
         if from_rate == to_rate {
             return samples.to_vec();
         }
 
-        // Create resampler
-        let chunk_size = 1024;
-        let mut resampler = FftFixedIn::<f32>::new(
-            from_rate as usize,
-            to_rate as usize,
-            chunk_size,
-            2, // sub_chunks for quality
-            1, // mono
-        )
-        .expect("Failed to create resampler");
+        let ratio = to_rate as f64 / from_rate as f64;
+        let output_len = (samples.len() as f64 * ratio).ceil() as usize;
+        let mut output = Vec::with_capacity(output_len);
 
-        let mut output = Vec::new();
-        let mut pos = 0;
+        for i in 0..output_len {
+            let src_pos = i as f64 / ratio;
+            let src_idx = src_pos.floor() as usize;
+            let frac = (src_pos - src_idx as f64) as f32;
 
-        // Process in chunks
-        while pos < samples.len() {
-            let end = (pos + chunk_size).min(samples.len());
-            let chunk = &samples[pos..end];
-
-            // Pad if needed
-            let input_chunk: Vec<f32> = if chunk.len() < chunk_size {
-                let mut padded = chunk.to_vec();
-                padded.resize(chunk_size, 0.0);
-                padded
-            } else {
-                chunk.to_vec()
-            };
-
-            let input = vec![input_chunk];
-            let resampled = resampler.process(&input, None).expect("Resampling failed");
-
-            if !resampled.is_empty() && !resampled[0].is_empty() {
-                output.extend_from_slice(&resampled[0]);
+            if src_idx + 1 < samples.len() {
+                // Linear interpolation between samples
+                let sample = samples[src_idx] * (1.0 - frac) + samples[src_idx + 1] * frac;
+                output.push(sample);
+            } else if src_idx < samples.len() {
+                output.push(samples[src_idx]);
             }
-
-            pos += chunk_size;
         }
-
-        // Trim to expected length
-        let expected_len = (samples.len() as f64 * to_rate as f64 / from_rate as f64) as usize;
-        output.truncate(expected_len);
 
         output
     }
@@ -422,46 +495,68 @@ mod inference {
             // Use GPU if available: Metal (macOS) or CUDA (NVIDIA)
             let device = Self::select_device();
             tracing::info!(device = ?device, "Using device for Whisper");
-            let model_id = match config.model_name.as_str() {
-                "whisper-small-en" => "openai/whisper-small.en",
-                "whisper-small" => "openai/whisper-small",
-                "whisper-tiny.en" => "openai/whisper-tiny.en",
-                "whisper-tiny" => "openai/whisper-tiny",
-                "whisper-base.en" => "openai/whisper-base.en",
-                "whisper-base" => "openai/whisper-base",
-                "whisper-medium.en" => "openai/whisper-medium.en",
-                "whisper-medium" => "openai/whisper-medium",
-                "whisper-large-v3" => "openai/whisper-large-v3",
-                other => other, // Allow direct model IDs
-            };
 
-            tracing::info!(model_id = model_id, "Loading Whisper model");
+            // Get model info from registry
+            let model_info = get_whisper_model_info(&config.model_name);
+            let is_quantized = model_info.quantization != QuantizationType::FP32;
+
+            tracing::info!(
+                model_name = %config.model_name,
+                model_id = %model_info.model_id,
+                quantization = ?model_info.quantization,
+                file_format = %model_info.file_format,
+                "Loading Whisper model"
+            );
 
             let api = Api::new().map_err(|e| WhisperError::DownloadError {
                 cause: e.to_string(),
             })?;
             let repo = api.repo(Repo::with_revision(
-                model_id.to_string(),
+                model_info.model_id.to_string(),
                 RepoType::Model,
                 "main".to_string(),
             ));
 
-            // Download model files
-            let config_path = repo
-                .get("config.json")
-                .map_err(|e| WhisperError::DownloadError {
-                    cause: format!("Failed to download config.json: {}", e),
-                })?;
-            let tokenizer_path =
-                repo.get("tokenizer.json")
+            // Download config and tokenizer files
+            // For quantized models, config/tokenizer come from the base OpenAI model
+            let (config_path, tokenizer_path) = if is_quantized {
+                // Quantized tiny models need config from openai/whisper-tiny
+                let base_model_id = match model_info.language {
+                    "en" => "openai/whisper-tiny.en",
+                    _ => "openai/whisper-tiny",
+                };
+                let base_repo = api.repo(Repo::with_revision(
+                    base_model_id.to_string(),
+                    RepoType::Model,
+                    "main".to_string(),
+                ));
+
+                let cfg =
+                    base_repo
+                        .get("config.json")
+                        .map_err(|e| WhisperError::DownloadError {
+                            cause: format!("Failed to download config.json: {}", e),
+                        })?;
+                let tok =
+                    base_repo
+                        .get("tokenizer.json")
+                        .map_err(|e| WhisperError::DownloadError {
+                            cause: format!("Failed to download tokenizer.json: {}", e),
+                        })?;
+                (cfg, tok)
+            } else {
+                let cfg = repo
+                    .get("config.json")
+                    .map_err(|e| WhisperError::DownloadError {
+                        cause: format!("Failed to download config.json: {}", e),
+                    })?;
+                let tok = repo
+                    .get("tokenizer.json")
                     .map_err(|e| WhisperError::DownloadError {
                         cause: format!("Failed to download tokenizer.json: {}", e),
                     })?;
-            let model_path =
-                repo.get("model.safetensors")
-                    .map_err(|e| WhisperError::DownloadError {
-                        cause: format!("Failed to download model.safetensors: {}", e),
-                    })?;
+                (cfg, tok)
+            };
 
             // Load config
             let config_str = std::fs::read_to_string(&config_path).map_err(|e| {
@@ -498,19 +593,68 @@ mod inference {
                 &mut mel_filters,
             );
 
-            // Load model weights
-            let vb = unsafe {
-                VarBuilder::from_mmaped_safetensors(&[model_path], DType::F32, &device).map_err(
-                    |e| WhisperError::InferenceError {
-                        cause: format!("Failed to load model weights: {}", e),
-                    },
-                )?
+            // Load model based on quantization type
+            let model = match model_info.quantization {
+                QuantizationType::FP32 => {
+                    // Download and load FP32 safetensors model
+                    let model_path =
+                        repo.get("model.safetensors")
+                            .map_err(|e| WhisperError::DownloadError {
+                                cause: format!("Failed to download model.safetensors: {}", e),
+                            })?;
+
+                    let vb = unsafe {
+                        VarBuilder::from_mmaped_safetensors(&[model_path], DType::F32, &device)
+                            .map_err(|e| WhisperError::InferenceError {
+                                cause: format!("Failed to load model weights: {}", e),
+                            })?
+                    };
+                    Model::Normal(m::model::Whisper::load(&vb, model_config.clone()).map_err(
+                        |e| WhisperError::InferenceError {
+                            cause: format!("Failed to load Whisper model: {}", e),
+                        },
+                    )?)
+                }
+                QuantizationType::Q8K | QuantizationType::Q4K => {
+                    // Download and load quantized GGUF model from lmz/candle-whisper
+                    // Available files: model-tiny-en-q80.gguf, model-tiny-q80.gguf, etc.
+                    let gguf_filename = match (model_info.language, model_info.quantization) {
+                        ("en", QuantizationType::Q8K) => "model-tiny-en-q80.gguf",
+                        ("en", QuantizationType::Q4K) => "model-tiny-en-q40.gguf",
+                        (_, QuantizationType::Q8K) => "model-tiny-q80.gguf",
+                        (_, QuantizationType::Q4K) => "model-tiny-q40.gguf",
+                        _ => "model-tiny-q80.gguf",
+                    };
+
+                    let model_path =
+                        repo.get(gguf_filename)
+                            .map_err(|e| WhisperError::DownloadError {
+                                cause: format!("Failed to download {}: {}", gguf_filename, e),
+                            })?;
+
+                    tracing::info!(
+                        gguf_file = %gguf_filename,
+                        quantization = ?model_info.quantization,
+                        "Loading quantized GGUF model"
+                    );
+
+                    let vb = candle_transformers::quantized_var_builder::VarBuilder::from_gguf(
+                        &model_path,
+                        &device,
+                    )
+                    .map_err(|e| WhisperError::InferenceError {
+                        cause: format!("Failed to load quantized model: {}", e),
+                    })?;
+
+                    Model::Quantized(
+                        m::quantized_model::Whisper::load(&vb, model_config.clone()).map_err(
+                            |e| WhisperError::InferenceError {
+                                cause: format!("Failed to load quantized Whisper model: {}", e),
+                            },
+                        )?,
+                    )
+                }
             };
-            let model = Model::Normal(m::model::Whisper::load(&vb, model_config.clone()).map_err(
-                |e| WhisperError::InferenceError {
-                    cause: format!("Failed to load Whisper model: {}", e),
-                },
-            )?);
 
             tracing::info!("Whisper model loaded successfully");
 
