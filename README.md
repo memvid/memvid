@@ -293,11 +293,62 @@ cargo run --example test_whisper --features whisper
 
 ## Text Embedding Models
 
-The `vec` feature includes local text embedding support using ONNX models. Before using local text embeddings, you need to download the model files manually.
+The `vec` feature includes local text embedding support using ONNX models.
 
-### Quick Start: BGE-small (Recommended)
+### Quick Start: Automatic Downloads (Recommended)
 
-Download the default BGE-small model (384 dimensions, fast and efficient):
+Models are automatically downloaded from HuggingFace on first use:
+
+```rust
+use memvid_core::text_embed::{LocalTextEmbedder, TextEmbedConfig};
+use memvid_core::types::embedding::EmbeddingProvider;
+
+// Enable automatic downloads
+let config = TextEmbedConfig::with_auto_download();
+let embedder = LocalTextEmbedder::new(config)?;
+// ↑ Downloads ~133MB BGE-small model on first use, then uses cache
+
+let embedding = embedder.embed_text("hello world")?;
+assert_eq!(embedding.len(), 384);
+```
+
+**What happens:**
+- First run: Downloads model (~133MB) and tokenizer (~711KB) to `~/.cache/memvid/text-models/`
+- Subsequent runs: Uses cached files (instant startup)
+- Cache location: `~/.cache/memvid/text-models/` or `.memvid-cache/text-models/`
+
+### Available Models
+
+| Model                   | Dimensions | Size  | Best For              |
+| ----------------------- | ---------- | ----- | --------------------- |
+| `bge-small-en-v1.5`     | 384        | ~133MB | Default, fast         |
+| `bge-base-en-v1.5`      | 768        | ~438MB | Better quality        |
+| `nomic-embed-text-v1.5` | 768        | ~548MB | Versatile tasks       |
+| `gte-large`             | 1024       | ~1.3GB | Highest quality       |
+
+### Selecting a Model
+
+```rust
+// Use default (BGE-small)
+let config = TextEmbedConfig::with_auto_download();
+
+// Or select a specific model
+let config = TextEmbedConfig {
+    model_name: "bge-base-en-v1.5".to_string(),
+    auto_download: true,
+    ..Default::default()
+};
+
+// Convenience methods
+let config = TextEmbedConfig::bge_small();    // 384d, ~133MB
+let config = TextEmbedConfig::bge_base();     // 768d, ~438MB
+let config = TextEmbedConfig::gte_large();    // 1024d, ~1.3GB
+let config = TextEmbedConfig::nomic();        // 768d, ~548MB
+```
+
+### Manual Downloads (Alternative)
+
+If you prefer to download models manually or work offline:
 
 ```bash
 mkdir -p ~/.cache/memvid/text-models
@@ -311,16 +362,16 @@ curl -L 'https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer.js
   -o ~/.cache/memvid/text-models/bge-small-en-v1.5_tokenizer.json
 ```
 
-### Available Models
+Then use offline mode:
 
-| Model                   | Dimensions | Size  | Best For              |
-| ----------------------- | ---------- | ----- | --------------------- |
-| `bge-small-en-v1.5`     | 384        | ~120MB | Default, fast         |
-| `bge-base-en-v1.5`      | 768        | ~420MB | Better quality        |
-| `nomic-embed-text-v1.5` | 768        | ~530MB | Versatile tasks       |
-| `gte-large`             | 1024       | ~1.3GB | Highest quality       |
+```rust
+let config = TextEmbedConfig::default();  // auto_download: false by default
+// or explicitly
+let config = TextEmbedConfig::offline();
+let embedder = LocalTextEmbedder::new(config)?;
+```
 
-### Other Models
+### Other Models (Manual Download)
 
 **BGE-base** (768 dimensions):
 ```bash
@@ -344,24 +395,6 @@ curl -L 'https://huggingface.co/thenlper/gte-large/resolve/main/onnx/model.onnx'
   -o ~/.cache/memvid/text-models/gte-large.onnx
 curl -L 'https://huggingface.co/thenlper/gte-large/resolve/main/tokenizer.json' \
   -o ~/.cache/memvid/text-models/gte-large_tokenizer.json
-```
-
-### Usage in Code
-
-```rust
-use memvid_core::text_embed::{LocalTextEmbedder, TextEmbedConfig};
-use memvid_core::types::embedding::EmbeddingProvider;
-
-// Use default model (BGE-small)
-let config = TextEmbedConfig::default();
-let embedder = LocalTextEmbedder::new(config)?;
-
-let embedding = embedder.embed_text("hello world")?;
-assert_eq!(embedding.len(), 384);
-
-// Use different model
-let config = TextEmbedConfig::bge_base();
-let embedder = LocalTextEmbedder::new(config)?;
 ```
 
 See `examples/text_embedding.rs` for a complete example with similarity computation and search ranking.
