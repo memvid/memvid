@@ -1,3 +1,5 @@
+// Safe unwrap/expect: Option takes with immediate value replacement.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use std::cell::Cell;
 use std::cmp::min;
 use std::fs::OpenOptions;

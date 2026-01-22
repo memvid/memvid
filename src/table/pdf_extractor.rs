@@ -1,3 +1,5 @@
+// Safe unwrap: Float comparisons and known-valid iterator operations.
+#![allow(clippy::unwrap_used)]
 //! PDF table extraction using Lattice and Stream detection.
 //!
 //! This module implements two complementary table detection strategies:

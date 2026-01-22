@@ -1,3 +1,5 @@
+// Safe expect: guaranteed non-empty iterators after length check.
+#![allow(clippy::expect_used)]
 use std::collections::HashMap;
 
 use crate::memvid::lifecycle::Memvid;

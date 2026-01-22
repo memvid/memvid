@@ -1,3 +1,5 @@
+// Safe expect/unwrap: Regex patterns are compile-time literals; JSON ops on known schemas.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use std::collections::{BTreeMap, BTreeSet};
 
 use once_cell::sync::Lazy;

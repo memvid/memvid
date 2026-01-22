@@ -1,3 +1,5 @@
+// Safe unwrap/expect: JSON value access with fallback defaults.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! MV2 storage integration for extracted tables.
 //!
 //! This module handles storing and retrieving tables from MV2 files

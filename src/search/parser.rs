@@ -1,3 +1,5 @@
+// Safe unwrap/expect: regex patterns from validated input strings.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use crate::error::MemvidError;
 use regex::Regex;
 use std::convert::TryFrom;

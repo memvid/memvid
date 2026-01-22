@@ -1,3 +1,5 @@
+// Safe expect: Static NER model lookup with guaranteed default.
+#![allow(clippy::expect_used)]
 //! Named Entity Recognition (NER) module using DistilBERT-NER ONNX.
 //!
 //! This module provides entity extraction capabilities using DistilBERT-NER,

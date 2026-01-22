@@ -1,3 +1,5 @@
+// Safe unwrap: float comparisons with fallback ordering.
+#![allow(clippy::unwrap_used)]
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::num::NonZeroU64;

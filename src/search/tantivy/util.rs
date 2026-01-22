@@ -1,3 +1,5 @@
+// Safe unwrap: single-element vector pop after length == 1 check.
+#![allow(clippy::unwrap_used)]
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query};
 
 pub(super) fn to_search_value(value: &str) -> String {

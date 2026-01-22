@@ -1,3 +1,5 @@
+// Safe expect: Regex patterns are compile-time literals, verified valid.
+#![allow(clippy::expect_used)]
 //! PII (Personally Identifiable Information) detection and masking
 //!
 //! This module provides functionality to detect and mask sensitive PII in text

@@ -1,3 +1,5 @@
+// Safe unwrap: single-element vector pop after length check.
+#![allow(clippy::unwrap_used)]
 use std::ops::Bound;
 
 use super::engine::TantivyEngine;

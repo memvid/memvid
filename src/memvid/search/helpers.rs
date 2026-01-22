@@ -1,3 +1,5 @@
+// Safe unwrap: guaranteed non-empty vector operations.
+#![allow(clippy::unwrap_used)]
 use crate::MemvidError;
 use crate::Result;
 use crate::memvid::lifecycle::Memvid;

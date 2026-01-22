@@ -1,3 +1,5 @@
+// Safe expect: Static Whisper model lookup with guaranteed default.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Whisper audio transcription with Candle inference.
 //!
 //! This module provides complete Whisper transcription functionality including:

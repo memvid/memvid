@@ -1,3 +1,5 @@
+// Safe unwrap: fixed-size byte conversions.
+#![allow(clippy::unwrap_used)]
 //! Time-travel replay for agent sessions.
 //!
 //! This module provides deterministic recording and replay of agent sessions,

@@ -1,5 +1,6 @@
+// Safe unwrap: regex from validated patterns.
+#![allow(clippy::unwrap_used)]
 #![cfg(feature = "lex")]
-
 #[cfg(feature = "temporal_track")]
 use super::helpers::attach_temporal_metadata;
 use super::helpers::{

@@ -1,3 +1,5 @@
+// Safe expect: Static CLIP model lookup with guaranteed default.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! CLIP (Contrastive Language-Image Pre-training) visual embeddings module.
 //!
 //! This module provides visual understanding capabilities using MobileCLIP-S2,
