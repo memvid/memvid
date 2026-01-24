@@ -1,20 +1,33 @@
-<img width="2000" height="491" alt="Social Cover (6)" src="https://github.com/user-attachments/assets/4e256804-53ac-4173-bcff-81994d52bf5c" />
+<!-- HEADER:START -->
+<img width="2000" height="524" alt="Social Cover (9)" src="https://github.com/user-attachments/assets/cf66f045-c8be-494b-b696-b8d7e4fb709c" />
+<!-- HEADER:END -->
 
+<!-- FLAGS:START -->
 <p align="center">
-  <strong>Memvid es una capa de memoria de un solo archivo para agentes de IA, con recuperación instantánea y memoria a largo plazo.</strong><br/>
-  Memoria persistente, versionada y portable, sin bases de datos.
+ <a href="../../README.md">🇺🇸 English</a>
+ <a href="README.es.md">🇪🇸 Español</a>
+ <a href="README.fr.md">🇫🇷 Français</a>
+ <a href="README.so.md">🇸🇴 Soomaali</a>
+ <a href="README.ar.md">🇸🇦 العربية</a>
+ <a href="README.nl.md">🇧🇪/🇳🇱 Nederlands</a>
+ <a href="README.ko.md">🇰🇷 한국어</a>
+ <a href="README.ja.md">🇯🇵 日本語</a>
 </p>
+<!-- FLAGS:END -->
 
+<!-- NAV:START -->
 <p align="center">
-  <a href="https://www.memvid.com">Sitio web</a>
+  <a href="https://www.memvid.com">Website</a>
   ·
-  <a href="https://sandbox.memvid.com">Probar Sandbox</a>
+  <a href="https://sandbox.memvid.com">Try Sandbox</a>
   ·
   <a href="https://docs.memvid.com">Docs</a>
   ·
   <a href="https://github.com/memvid/memvid/discussions">Discussions</a>
 </p>
+<!-- NAV:END -->
 
+<!-- BADGES:START -->
 <p align="center">
   <a href="https://crates.io/crates/memvid-core"><img src="https://img.shields.io/crates/v/memvid-core?style=flat-square&logo=rust" alt="Crates.io" /></a>
   <a href="https://docs.rs/memvid-core"><img src="https://img.shields.io/docsrs/memvid-core?style=flat-square&logo=docs.rs" alt="docs.rs" /></a>
@@ -29,7 +42,13 @@
 </p>
 
 <p align="center">
-    <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/</a>
+    <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+</p>
+<!-- BADGES:END -->
+
+<p align="center">
+  <strong>Memvid es una capa de memoria de un solo archivo para agentes de IA, con recuperación instantánea y memoria a largo plazo.</strong><br/>
+  Memoria persistente, versionada y portable, sin bases de datos.
 </p>
 
 <h2 align="center">⭐️ Deja una STAR para apoyar el proyecto ⭐️</h2>
@@ -322,5 +341,4 @@ Email: contact@memvid.com
 ## Licencia
 
 Apache License 2.0 — consulta el archivo [LICENSE](LICENSE) para más detalles.
-
 
