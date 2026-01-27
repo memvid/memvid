@@ -96,6 +96,10 @@ pub struct Memvid {
     /// Completed sessions stored in memory (until persisted to file).
     #[cfg(feature = "replay")]
     pub(crate) completed_sessions: Vec<crate::replay::ReplaySession>,
+    /// Transient cache for tag embeddings to support semantic tag suggestion.
+    /// Not persisted to disk.
+    pub(crate) tag_embeddings_cache:
+        std::sync::Arc<std::sync::RwLock<std::collections::HashMap<String, Vec<f32>>>>,
 }
 
 /// Controls read-only open behaviour for `.mv2` memories.
@@ -208,6 +212,7 @@ impl Memvid {
             active_session: None,
             #[cfg(feature = "replay")]
             completed_sessions: Vec::new(),
+            tag_embeddings_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
         };
 
         #[cfg(feature = "lex")]
@@ -386,6 +391,7 @@ impl Memvid {
             active_session: None,
             #[cfg(feature = "replay")]
             completed_sessions: Vec::new(),
+            tag_embeddings_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
         };
         memvid.data_end = compute_data_end(&memvid.toc, &memvid.header);
         // Use consolidated helper for lex_enabled check
@@ -514,6 +520,7 @@ impl Memvid {
             active_session: None,
             #[cfg(feature = "replay")]
             completed_sessions: Vec::new(),
+            tag_embeddings_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
         };
 
         // Use consolidated helper for lex_enabled check
