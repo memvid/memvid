@@ -1793,6 +1793,7 @@ impl Memvid {
                 bytes_length: 0,
                 checksum: empty_checksum,
                 compression_mode: self.vec_compression.clone(),
+                model: self.vec_model.clone(),
             });
         }
         if let Some(manifest) = self.toc.indexes.vec.as_mut() {
@@ -2047,6 +2048,7 @@ impl Memvid {
                 bytes_length: artifact.bytes.len() as u64,
                 checksum: artifact.checksum,
                 compression_mode: self.vec_compression.clone(),
+                model: self.vec_model.clone(),
             });
             self.vec_index = Some(index);
         } else {

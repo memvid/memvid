@@ -717,6 +717,10 @@ pub struct VecIndexManifest {
     /// Compression mode for vector storage (default: None for backward compatibility)
     #[serde(default)]
     pub compression_mode: VectorCompression,
+    /// Model used to generate embeddings (e.g., "openai-text-embedding-3-small").
+    /// Added in v2 to prevent model mismatch.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

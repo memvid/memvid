@@ -67,6 +67,7 @@ pub struct Memvid {
     pub(crate) lex_storage: Arc<RwLock<EmbeddedLexStorage>>,
     pub(crate) vec_enabled: bool,
     pub(crate) vec_compression: VectorCompression,
+    pub(crate) vec_model: Option<String>,
     pub(crate) vec_index: Option<VecIndex>,
     /// CLIP visual embeddings index (separate from vec due to different dimensions)
     pub(crate) clip_enabled: bool,
@@ -187,6 +188,7 @@ impl Memvid {
             lex_storage,
             vec_enabled: cfg!(feature = "vec"), // Enable by default if feature is enabled
             vec_compression: VectorCompression::None,
+            vec_model: None,
             vec_index: None,
             clip_enabled: cfg!(feature = "clip"), // Enable by default if feature is enabled
             clip_index: None,
@@ -365,6 +367,7 @@ impl Memvid {
             lex_storage,
             vec_enabled: false,
             vec_compression: VectorCompression::None,
+            vec_model: None,
             vec_index: None,
             clip_enabled: false,
             clip_index: None,
@@ -493,6 +496,7 @@ impl Memvid {
             lex_storage,
             vec_enabled: false,
             vec_compression: VectorCompression::None,
+            vec_model: None,
             vec_index: None,
             clip_enabled: false,
             clip_index: None,
