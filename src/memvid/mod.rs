@@ -21,6 +21,7 @@ pub mod replay_ops;
 pub mod search;
 mod segments;
 pub mod sketch;
+pub mod tags;
 pub mod ticket;
 pub mod timeline;
 #[cfg(feature = "parallel_segments")]
