@@ -123,6 +123,9 @@ impl Memvid {
     }
 
     pub(crate) fn load_vec_index_from_manifest(&mut self) -> Result<()> {
+        // Load the model name from the manifest regardless of validation success
+        self.vec_model = self.toc.indexes.vec.as_ref().and_then(|m| m.model.clone());
+
         if let Some(manifest) = &self.toc.indexes.vec {
             // Empty manifest (placeholder for enabled but not yet populated index)
             if manifest.bytes_length == 0 {

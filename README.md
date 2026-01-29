@@ -418,6 +418,18 @@ let embedder = LocalTextEmbedder::new(config)?;
 
 See `examples/text_embedding.rs` for a complete example with similarity computation and search ranking.
 
+### Model Consistency
+
+To prevent accidental model mixing (e.g., querying a BGE-small index with OpenAI embeddings), you can explicitly bind your Memvid instance to a specific model name:
+
+```rust
+// Bind the index to a specific model.
+// If the index was previously created with a different model, this will return an error.
+mem.set_vec_model("bge-small-en-v1.5")?;
+```
+
+This binding is persistent. Once set, future attempts to use a different model name will fail fast with a `ModelMismatch` error.
+
 ---
 
 ## API Embeddings (OpenAI)

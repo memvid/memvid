@@ -87,10 +87,35 @@ impl Memvid {
                 bytes_length: 0,
                 checksum: empty_checksum,
                 compression_mode: self.vec_compression.clone(),
+                model: self.vec_model.clone(),
             });
         }
 
         // No need to commit here - the manifest will be written during next commit/seal
+        Ok(())
+    }
+
+    /// Set the expected embedding model for the vector index.
+    ///
+    /// If the index is already bound to a model (from a previous session or call),
+    /// this validates that the requested model matches the existing one.
+    /// If unbound, it binds the index to the new model.
+    pub fn set_vec_model(&mut self, model: &str) -> Result<()> {
+        if let Some(existing) = &self.vec_model {
+            if existing != model {
+                return Err(MemvidError::ModelMismatch {
+                    expected: existing.clone(),
+                    actual: model.to_string(),
+                });
+            }
+        } else {
+            self.vec_model = Some(model.to_string());
+            // If manifest exists, update it to persist the binding
+            if let Some(manifest) = self.toc.indexes.vec.as_mut() {
+                manifest.model = Some(model.to_string());
+                self.dirty = true;
+            }
+        }
         Ok(())
     }
 

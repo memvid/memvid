@@ -510,6 +510,7 @@ impl Memvid {
             bytes_length: artifact.bytes.len() as u64,
             checksum: artifact.checksum,
             compression_mode: crate::types::VectorCompression::None,
+            model: self.vec_model.clone(),
         });
 
         self.dirty = true;

@@ -205,6 +205,9 @@ pub enum MemvidError {
     #[error("Reranking failed: {reason}")]
     RerankFailed { reason: Box<str> },
 
+    #[error("Model mismatch: Index is bound to '{expected}', but requested model was '{actual}'")]
+    ModelMismatch { expected: String, actual: String },
+
     #[error("Invalid query: {reason}")]
     InvalidQuery { reason: String },
 
