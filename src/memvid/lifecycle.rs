@@ -245,6 +245,7 @@ impl Memvid {
                 bytes_length: 0,
                 checksum: empty_checksum,
                 compression_mode: memvid.vec_compression.clone(),
+                model: memvid.vec_model.clone(),
             });
         }
 

@@ -139,6 +139,11 @@ pub mod symspell_cleanup;
 #[cfg(feature = "api_embed")]
 pub mod api_embed;
 
+// HTTP streaming support for CDN-hosted .mv2 files (S3, CloudFront, R2, etc.)
+// Enables read-only access via HTTP range requests without downloading entire file
+#[cfg(feature = "streaming")]
+pub mod streaming;
+
 #[cfg(test)]
 mod tests_lex_flag;
 
@@ -321,6 +326,13 @@ pub use replay::{
 pub use replay::{
     ActiveSession, ComparisonReport, ComparisonSummary, Divergence, DivergenceType, ModelResult,
     ReplayConfig, ReplayOptions, ReplayResult,
+};
+
+// HTTP streaming support for CDN-hosted .mv2 files
+#[cfg(feature = "streaming")]
+pub use streaming::{
+    HttpAuthConfig, HttpConfig, HttpStreamingSource, LocalStreamingSource, StreamingError,
+    StreamingMemvid, StreamingSource,
 };
 
 #[cfg(test)]
