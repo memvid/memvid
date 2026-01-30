@@ -465,6 +465,10 @@ mod tests {
         fn embedding_dimension(&self) -> usize {
             self.dimension
         }
+
+        fn model_name(&self) -> Option<&str> {
+            Some("mock-model")
+        }
     }
 
     #[test]

@@ -101,18 +101,21 @@ impl Memvid {
     /// this validates that the requested model matches the existing one.
     /// If unbound, it binds the index to the new model.
     pub fn set_vec_model(&mut self, model: &str) -> Result<()> {
+        let model = model.trim().to_lowercase();
         if let Some(existing) = &self.vec_model {
-            if existing != model {
+            // Compare against normalized existing model
+            let existing_normalized = existing.trim().to_lowercase();
+            if existing_normalized != model {
                 return Err(MemvidError::ModelMismatch {
-                    expected: existing.clone(),
-                    actual: model.to_string(),
+                    expected: existing_normalized,
+                    actual: model,
                 });
             }
         } else {
-            self.vec_model = Some(model.to_string());
+            self.vec_model = Some(model.clone());
             // If manifest exists, update it to persist the binding
             if let Some(manifest) = self.toc.indexes.vec.as_mut() {
-                manifest.model = Some(model.to_string());
+                manifest.model = Some(model);
                 self.dirty = true;
             }
         }
@@ -267,6 +270,27 @@ impl Memvid {
         snippet_chars: usize,
         scope: Option<&str>,
     ) -> Result<crate::types::SearchResponse> {
+        self.vec_search_with_embedding_verified(
+            query,
+            query_embedding,
+            top_k,
+            snippet_chars,
+            scope,
+            None,
+        )
+    }
+
+    /// Perform pure vector search using a pre-computed query embedding.
+    /// This searches the entire vector index directly, like Chroma does.
+    pub fn vec_search_with_embedding_verified(
+        &mut self,
+        query: &str,
+        query_embedding: &[f32],
+        top_k: usize,
+        snippet_chars: usize,
+        scope: Option<&str>,
+        model_name: Option<&str>,
+    ) -> Result<crate::types::SearchResponse> {
         use super::helpers::{build_context, timestamp_to_rfc3339};
         use crate::types::{
             SearchEngineKind, SearchHit, SearchHitMetadata, SearchParams, SearchResponse,
@@ -275,6 +299,20 @@ impl Memvid {
 
         if !self.vec_enabled {
             return Err(MemvidError::VecNotEnabled);
+        }
+
+        // Validate model consistency if provided
+        if let Some(requested_model) = model_name {
+            if let Some(bound_model) = &self.vec_model {
+                let requested = requested_model.trim().to_lowercase();
+                // bound_model is already normalized by set_vec_model
+                if *bound_model != requested {
+                    return Err(MemvidError::ModelMismatch {
+                        expected: bound_model.clone(),
+                        actual: requested_model.to_string(), // Return original string for better error
+                    });
+                }
+            }
         }
 
         // Validate embedding dimension BEFORE searching to prevent silent wrong results.
@@ -311,7 +349,27 @@ impl Memvid {
             self.ensure_vec_index()?;
         }
 
-        let vec_index = self.vec_index.as_ref().ok_or(MemvidError::VecNotEnabled)?;
+        let vec_index = if let Some(index) = self.vec_index.as_ref() {
+            index
+        } else {
+            // If explicitly enabled but empty/failed to load, return empty results
+            // instead of claiming it's disabled.
+            let elapsed_ms = start_time.elapsed().as_millis();
+            return Ok(SearchResponse {
+                query: query.to_string(),
+                elapsed_ms,
+                total_hits: 0,
+                params: SearchParams {
+                    top_k,
+                    snippet_chars,
+                    cursor: None,
+                },
+                hits: Vec::new(),
+                context: build_context(&[]),
+                next_cursor: None,
+                engine: SearchEngineKind::Hybrid,
+            });
+        };
 
         // Do pure vector search over entire index
         let vec_hits = vec_index.search(query_embedding, top_k * 2);
@@ -457,6 +515,7 @@ impl Memvid {
     /// let result = memvid.search_adaptive("query", &embedding, config, 200, None)?;
     /// println!("Returned {} of {} results", result.stats.returned, result.stats.total_considered);
     /// ```
+    /// Perform adaptive search combining lexical and vector retrieval.
     pub fn search_adaptive(
         &mut self,
         query: &str,
@@ -465,16 +524,29 @@ impl Memvid {
         snippet_chars: usize,
         scope: Option<&str>,
     ) -> Result<AdaptiveResult<SearchHit>> {
+        self.search_adaptive_verified(query, query_embedding, config, snippet_chars, scope, None)
+    }
+
+    pub fn search_adaptive_verified(
+        &mut self,
+        query: &str,
+        query_embedding: &[f32],
+        config: AdaptiveConfig,
+        snippet_chars: usize,
+        scope: Option<&str>,
+        model_name: Option<&str>,
+    ) -> Result<AdaptiveResult<SearchHit>> {
         use std::time::Instant;
 
         if !config.enabled {
             // Fall back to standard search with max_results as top_k
-            let response = self.vec_search_with_embedding(
+            let response = self.vec_search_with_embedding_verified(
                 query,
                 query_embedding,
                 config.max_results,
                 snippet_chars,
                 scope,
+                model_name,
             )?;
             return Ok(AdaptiveResult {
                 results: response.hits,
@@ -493,12 +565,13 @@ impl Memvid {
         let start_time = Instant::now();
 
         // Over-retrieve: get max_results to have enough candidates
-        let response = self.vec_search_with_embedding(
+        let response = self.vec_search_with_embedding_verified(
             query,
             query_embedding,
             config.max_results,
             snippet_chars,
             scope,
+            model_name,
         )?;
 
         if response.hits.is_empty() {
@@ -1045,5 +1118,83 @@ impl Memvid {
         }
         engine.commit()?;
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::MemvidError;
+    use crate::memvid::lifecycle::Memvid;
+
+    #[test]
+    fn test_model_consistency_normalization() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("model_consistency.mv2");
+        let mut mem = Memvid::create(&path)?;
+
+        // Initial binding with loose casing/whitespace
+        mem.set_vec_model("  OpenAI  ")?;
+        assert_eq!(mem.vec_model.as_deref(), Some("openai"));
+
+        // Re-binding with same normalized name should succeed
+        mem.set_vec_model("OPENAI")?;
+        assert_eq!(mem.vec_model.as_deref(), Some("openai"));
+
+        // Re-binding with different name should fail
+        let err = mem.set_vec_model("DifferentModel").unwrap_err();
+        match err {
+            MemvidError::ModelMismatch { expected, actual } => {
+                assert_eq!(expected, "openai");
+                assert_eq!(actual, "differentmodel");
+            }
+            _ => panic!("Expected ModelMismatch error"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_search_time_validation() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("search_validation.mv2");
+        let mut mem = Memvid::create(&path)?;
+        mem.enable_vec()?;
+
+        // Bind model
+        mem.set_vec_model("my-model")?;
+
+        // Search with correct model should succeed (empty index, returns empty results)
+        let res = mem.vec_search_with_embedding_verified(
+            "query",
+            &vec![0.0; 384],
+            10,
+            100,
+            None,
+            Some("My-Model"), // Case insensitive check
+        )?;
+        assert!(res.hits.is_empty());
+
+        // Search with wrong model should fail
+        let err = mem
+            .vec_search_with_embedding_verified(
+                "query",
+                &vec![0.0; 384],
+                10,
+                100,
+                None,
+                Some("Wrong-Model"),
+            )
+            .unwrap_err();
+
+        match err {
+            MemvidError::ModelMismatch { expected, actual } => {
+                assert_eq!(expected, "my-model");
+                assert_eq!(actual, "Wrong-Model");
+            }
+            _ => panic!("Expected ModelMismatch error, got {:?}", err),
+        }
+
+        Ok(())
     }
 }

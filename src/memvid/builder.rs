@@ -464,7 +464,7 @@ mod tests {
 
             let mut reopened = Memvid::open_read_only(&path)?;
             let err = reopened
-                .vec_search_with_embedding("hello", &vec![0.0f32; 384], 5, 240, None)
+                .vec_search_with_embedding("hello", &vec![0.0f32; 384], 5, 240, None, None)
                 .unwrap_err();
             match err {
                 MemvidError::VecDimensionMismatch { expected, actual } => {
