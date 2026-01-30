@@ -458,6 +458,32 @@ impl EmbeddingProvider for OpenAIEmbedder {
         // We have an API key, so we're ready
         !self.api_key.is_empty()
     }
+
+    fn model_name(&self) -> &str {
+        self.model_info.name
+    }
+}
+
+// ============================================================================
+// VecEmbedder Implementation
+// ============================================================================
+
+impl crate::types::VecEmbedder for OpenAIEmbedder {
+    fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
+        self.embed_text(text)
+    }
+
+    fn embed_chunks(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        self.embed_batch(texts)
+    }
+
+    fn embedding_dimension(&self) -> usize {
+        self.model_info.dimension
+    }
+
+    fn model_name(&self) -> Option<&str> {
+        Some(self.model_info.name)
+    }
 }
 
 // ============================================================================

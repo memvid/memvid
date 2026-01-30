@@ -540,6 +540,11 @@ impl Memvid {
         embedder: E,
         batch_size: usize,
     ) -> Result<(usize, usize)> {
+        // Auto-bind the vector index to the model we're using
+        if let Some(model_name) = embedder.model_name() {
+            self.set_vec_model(model_name)?;
+        }
+
         let mut batcher = EmbeddingBatcher::new(embedder, batch_size);
         let mut frames_processed = 0;
         let mut embeddings_generated = 0;
