@@ -33,7 +33,7 @@ use super::source::{StreamingResult, StreamingSource};
 /// - Frame content is fetched on demand via `frame_content()`
 ///
 /// TODO: The vector index is loaded on the first `search_vec()` call (not implemented yet, as poc becomes stable)
-/// 
+///
 /// # Thread Safety
 ///
 /// The streaming source must be `Send + Sync`. Index caches are stored in `OnceLock`
