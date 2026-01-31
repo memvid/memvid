@@ -30,9 +30,10 @@ use super::source::{StreamingResult, StreamingSource};
 /// Indexes are loaded lazily on first use:
 /// - The header, footer, and TOC are loaded when `open()` is called
 /// - The lexical index is loaded on the first `search()` call
-/// - The vector index is loaded on the first `search_vec()` call
 /// - Frame content is fetched on demand via `frame_content()`
 ///
+/// TODO: The vector index is loaded on the first `search_vec()` call (not implemented yet, as poc becomes stable)
+/// 
 /// # Thread Safety
 ///
 /// The streaming source must be `Send + Sync`. Index caches are stored in `OnceLock`
@@ -42,7 +43,7 @@ pub struct StreamingMemvid<S: StreamingSource> {
     header: Header,
     toc: Toc,
     file_size: u64,
-    /// Cache for lazy-loaded lex index bytes (future Tantivy integration)
+    /// TODO: Cache for lazy-loaded lex index bytes (future Tantivy integration)
     #[cfg(feature = "lex")]
     #[allow(dead_code)]
     lex_index_bytes: OnceLock<Vec<u8>>,
