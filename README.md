@@ -5,12 +5,6 @@
 
 <div style="height: 16px;"></div>
 
-> ⚠️ **Memvid v1 (QR-based memory) is deprecated**
->
-> If you are referencing QR codes, you are using outdated information.
->
-> See: https://docs.memvid.com/memvid-v1-deprecation
-
 <p align="center">
     <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
@@ -152,18 +146,18 @@ memvid-core = "2.0"
 
 ### Feature Flags
 
-| Feature             | Description                                         |
-| ------------------- | --------------------------------------------------- |
-| `lex`               | Full-text search with BM25 ranking (Tantivy)        |
-| `pdf_extract`       | Pure Rust PDF text extraction                       |
+| Feature             | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `lex`               | Full-text search with BM25 ranking (Tantivy)                     |
+| `pdf_extract`       | Pure Rust PDF text extraction                                    |
 | `vec`               | Vector similarity search (HNSW + local text embeddings via ONNX) |
-| `clip`              | CLIP visual embeddings for image search             |
-| `whisper`           | Audio transcription with Whisper                    |
-| `api_embed`         | Cloud API embeddings (OpenAI)                       |
-| `temporal_track`    | Natural language date parsing ("last Tuesday")      |
-| `parallel_segments` | Multi-threaded ingestion                            |
-| `encryption`        | Password-based encryption capsules (.mv2e)          |
-| `symspell_cleanup`  | Robust PDF text repair (fixes "emp lo yee" -> "employee") |
+| `clip`              | CLIP visual embeddings for image search                          |
+| `whisper`           | Audio transcription with Whisper                                 |
+| `api_embed`         | Cloud API embeddings (OpenAI)                                    |
+| `temporal_track`    | Natural language date parsing ("last Tuesday")                   |
+| `parallel_segments` | Multi-threaded ingestion                                         |
+| `encryption`        | Password-based encryption capsules (.mv2e)                       |
+| `symspell_cleanup`  | Robust PDF text repair (fixes "emp lo yee" -> "employee")        |
 
 Enable features as needed:
 
@@ -306,11 +300,11 @@ cargo run --example test_whisper --features whisper -- /path/to/audio.mp3
 
 **Available Models:**
 
-| Model | Size | Speed | Use Case |
-|-------|------|-------|----------|
-| `whisper-small-en` | 244 MB | Slowest | Best accuracy (default) |
-| `whisper-tiny-en` | 75 MB | Fast | Balanced |
-| `whisper-tiny-en-q8k` | 19 MB | Fastest | Quick testing, resource-constrained |
+| Model                 | Size   | Speed   | Use Case                            |
+| --------------------- | ------ | ------- | ----------------------------------- |
+| `whisper-small-en`    | 244 MB | Slowest | Best accuracy (default)             |
+| `whisper-tiny-en`     | 75 MB  | Fast    | Balanced                            |
+| `whisper-tiny-en-q8k` | 19 MB  | Fastest | Quick testing, resource-constrained |
 
 **Model Selection:**
 
@@ -364,12 +358,12 @@ curl -L 'https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer.js
 
 ### Available Models
 
-| Model                   | Dimensions | Size  | Best For              |
-| ----------------------- | ---------- | ----- | --------------------- |
-| `bge-small-en-v1.5`     | 384        | ~120MB | Default, fast         |
-| `bge-base-en-v1.5`      | 768        | ~420MB | Better quality        |
-| `nomic-embed-text-v1.5` | 768        | ~530MB | Versatile tasks       |
-| `gte-large`             | 1024       | ~1.3GB | Highest quality       |
+| Model                   | Dimensions | Size   | Best For        |
+| ----------------------- | ---------- | ------ | --------------- |
+| `bge-small-en-v1.5`     | 384        | ~120MB | Default, fast   |
+| `bge-base-en-v1.5`      | 768        | ~420MB | Better quality  |
+| `nomic-embed-text-v1.5` | 768        | ~530MB | Versatile tasks |
+| `gte-large`             | 1024       | ~1.3GB | Highest quality |
 
 ### Other Models
 
@@ -463,11 +457,11 @@ let embedder = OpenAIEmbedder::new(config)?;
 
 ### Available Models
 
-| Model                      | Dimensions | Best For                    |
-| -------------------------- | ---------- | --------------------------- |
-| `text-embedding-3-small`   | 1536       | Default, fastest, cheapest  |
-| `text-embedding-3-large`   | 3072       | Highest quality             |
-| `text-embedding-ada-002`   | 1536       | Legacy model                |
+| Model                    | Dimensions | Best For                   |
+| ------------------------ | ---------- | -------------------------- |
+| `text-embedding-3-small` | 1536       | Default, fastest, cheapest |
+| `text-embedding-3-large` | 3072       | Highest quality            |
+| `text-embedding-ada-002` | 1536       | Legacy model               |
 
 See `examples/openai_embedding.rs` for a complete example.
 
@@ -507,6 +501,14 @@ Have questions or feedback?
 Email: contact@memvid.com
 
 **Drop a ⭐ to show support**
+
+---
+
+> ⚠️ **Memvid v1 (QR-based memory) is deprecated**
+>
+> If you are referencing QR codes, you are using outdated information.
+>
+> See: https://docs.memvid.com/memvid-v1-deprecation
 
 ---
 
