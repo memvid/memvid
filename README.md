@@ -411,17 +411,25 @@ let embedder = LocalTextEmbedder::new(config)?;
 
 See `examples/text_embedding.rs` for a complete example with similarity computation and search ranking.
 
-### Model Consistency
+### Model Consistency Protection
 
-To prevent accidental model mixing (e.g., querying a BGE-small index with OpenAI embeddings), you can explicitly bind your Memvid instance to a specific model name:
+To ensure long-term data integrity, Memvid supports binding a vector index to a specific embedding model. This prevents silent failures where a query is embedded with one model (e.g., `text-embedding-3-small`) while the index was built with another (e.g., `bge-small`), which would otherwise return irrelevant results.
+
+**Key Features:**
+- **Persistent Binding**: The model name is stored permanently in the `.mv2` header.
+- **Auto-Normalization**: Model names are case-insensitive and normalized (e.g., "OpenAI" and "openai" match).
+- **Search-Time Validation**: If you attempt to search a bound index with a different model, Memvid returns a `ModelMismatch` error immediately.
+
+**Usage:**
 
 ```rust
 // Bind the index to a specific model.
-// If the index was previously created with a different model, this will return an error.
-mem.set_vec_model("bge-small-en-v1.5")?;
+// If the index was previously bound to a different model, this returns ModelMismatch.
+mem.set_vec_model("text-embedding-3-small")?;
 ```
 
-This binding is persistent. Once set, future attempts to use a different model name will fail fast with a `ModelMismatch` error.
+**Backward Compatibility:**
+This feature is purely opt-in. Existing `.mv2` files without model information will continue to work in "promiscuous mode" (no validation) until a model is explicitly bound. This ensures seamless upgrades for existing deployments.
 
 
 

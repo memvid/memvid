@@ -161,4 +161,14 @@ pub trait VecEmbedder {
     }
 
     fn embedding_dimension(&self) -> usize;
+
+    /// Returns the name of the model used by this embedder.
+    ///
+    /// # Backward Compatibility
+    /// This method has a default implementation returning `None` to avoid breaking changes
+    /// for existing implementations. This default will be removed in a future major version,
+    /// making the method mandatory.
+    fn model_name(&self) -> Option<&str> {
+        None
+    }
 }

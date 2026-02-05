@@ -913,6 +913,28 @@ impl EmbeddingProvider for LocalTextEmbedder {
 }
 
 // ============================================================================
+// VecEmbedder Implementation
+// ============================================================================
+
+impl crate::types::VecEmbedder for LocalTextEmbedder {
+    fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
+        self.encode_text(text)
+    }
+
+    fn embed_chunks(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        self.encode_batch(texts)
+    }
+
+    fn embedding_dimension(&self) -> usize {
+        self.model_info.dims as usize
+    }
+
+    fn model_name(&self) -> Option<&str> {
+        Some(&self.config.model_name)
+    }
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
