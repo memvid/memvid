@@ -132,6 +132,8 @@ api_embed = ["dep:reqwest"]
 # SIMD acceleration for vector distance calculations
 simd = ["dep:wide"]
 hnsw_bench = ["dep:hnsw", "dep:rand", "dep:space", "dep:rand_pcg"]
+# HTTP streaming support for CDN-hosted .mv2 files (S3, CloudFront, R2, etc.)
+streaming = ["dep:reqwest"]
 
 [dev-dependencies]
 fastrand = "2.0"
@@ -154,6 +156,10 @@ required-features = ["api_embed"]
 name = "simd_benchmark"
 required-features = ["simd"]
 
+[[example]]
+name = "http_streaming"
+required-features = ["streaming"]
+
 [[bench]]
 name = "search_precision_benchmark"
 harness = false
@@ -162,3 +168,13 @@ harness = false
 name = "vec_search_benchmark"
 harness = false
 required-features = ["hnsw_bench"]
+
+[[bench]]
+name = "streaming_bench"
+harness = false
+required-features = ["streaming"]
+
+[[bench]]
+name = "http_streaming_bench"
+harness = false
+required-features = ["streaming"]

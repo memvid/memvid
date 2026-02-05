@@ -280,6 +280,7 @@ impl Memvid {
                 bytes_length: 0,
                 checksum: empty_checksum,
                 compression_mode: self.vec_compression.clone(),
+                model: self.vec_model.clone(),
             });
         }
         if let Some(manifest) = self.toc.indexes.vec.as_mut() {
