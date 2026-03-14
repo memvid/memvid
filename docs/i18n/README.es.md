@@ -58,6 +58,18 @@
 <h2 align="center">⭐️ Deja una STAR para apoyar el proyecto ⭐️</h2>
 </p>
 
+## Lo más destacado de los benchmarks
+
+**🚀 Mayor precisión que cualquier otro sistema de memoria:** +35% SOTA en LoCoMo, con recall y razonamiento conversacional de largo horizonte de primer nivel.
+
+**🧠 Mejor razonamiento multi-hop y temporal:** +76% en multi-hop y +56% en temporal frente al promedio de la industria.
+
+**⚡ Latencia ultra baja a escala:** 0.025 ms P50 y 0.075 ms P99, con 1,372× más throughput que los enfoques estándar.
+
+**🔬 Benchmarks totalmente reproducibles:** LoCoMo (10 conversaciones de ~26K tokens), evaluación open source y LLM-as-Judge.
+
+---
+
 ## ¿Qué es Memvid?
 
 Memvid es un sistema de memoria portable para IA que empaqueta tus datos, embeddings, estructura de búsqueda y metadatos en un solo archivo.
@@ -152,16 +164,18 @@ memvid-core = "2.0"
 
 ### Feature Flags
 
-| Feature             | Description                                    |
-| ------------------- | ---------------------------------------------- |
-| `lex`               | Full-text search with BM25 ranking (Tantivy)   |
-| `pdf_extract`       | Pure Rust PDF text extraction                  |
-| `vec`               | Vector similarity search (HNSW + ONNX)         |
-| `clip`              | CLIP visual embeddings for image search        |
-| `whisper`           | Audio transcription with Whisper               |
-| `temporal_track`    | Natural language date parsing ("last Tuesday") |
-| `parallel_segments` | Multi-threaded ingestion                       |
-| `encryption`        | Password-based encryption capsules (.mv2e)     |
+| Feature             | Descripción                                                        |
+| ------------------- | ------------------------------------------------------------------ |
+| `lex`               | Búsqueda full-text con ranking BM25 (Tantivy)                      |
+| `pdf_extract`       | Extracción de texto PDF 100% en Rust                               |
+| `vec`               | Búsqueda por similitud vectorial (HNSW + embeddings locales vía ONNX) |
+| `clip`              | Embeddings visuales CLIP para búsqueda de imágenes                 |
+| `whisper`           | Transcripción de audio con Whisper                                 |
+| `api_embed`         | Embeddings en la nube mediante API (OpenAI)                        |
+| `temporal_track`    | Interpretación de fechas en lenguaje natural ("el martes pasado")  |
+| `parallel_segments` | Ingesta multi-hilo                                                 |
+| `encryption`        | Cápsulas cifradas con contraseña (.mv2e)                           |
+| `symspell_cleanup`  | Reparación robusta de texto PDF (corrige "emp lo yee" -> "employee") |
 
 Activa las features según lo necesites:
 
@@ -305,6 +319,137 @@ cargo run --example test_whisper --features whisper
 
 ---
 
+## Modelos de embeddings de texto
+
+La feature `vec` incluye soporte para embeddings de texto locales usando modelos ONNX. Antes de usar embeddings locales, necesitas descargar manualmente los archivos del modelo.
+
+### Inicio rápido: BGE-small (recomendado)
+
+Descarga el modelo BGE-small por defecto (384 dimensiones, rápido y eficiente):
+
+```bash
+mkdir -p ~/.cache/memvid/text-models
+
+# Descargar modelo ONNX
+curl -L 'https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/onnx/model.onnx' \
+  -o ~/.cache/memvid/text-models/bge-small-en-v1.5.onnx
+
+# Descargar tokenizer
+curl -L 'https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer.json' \
+  -o ~/.cache/memvid/text-models/bge-small-en-v1.5_tokenizer.json
+```
+
+### Modelos disponibles
+
+| Modelo                  | Dimensiones | Tamaño | Mejor para            |
+| ----------------------- | ----------- | ------ | --------------------- |
+| `bge-small-en-v1.5`     | 384         | ~120MB | Opción por defecto, rápido |
+| `bge-base-en-v1.5`      | 768         | ~420MB | Mejor calidad         |
+| `nomic-embed-text-v1.5` | 768         | ~530MB | Tareas versátiles     |
+| `gte-large`             | 1024        | ~1.3GB | Máxima calidad        |
+
+### Otros modelos
+
+**BGE-base** (768 dimensiones):
+```bash
+curl -L 'https://huggingface.co/BAAI/bge-base-en-v1.5/resolve/main/onnx/model.onnx' \
+  -o ~/.cache/memvid/text-models/bge-base-en-v1.5.onnx
+curl -L 'https://huggingface.co/BAAI/bge-base-en-v1.5/resolve/main/tokenizer.json' \
+  -o ~/.cache/memvid/text-models/bge-base-en-v1.5_tokenizer.json
+```
+
+**Nomic** (768 dimensiones):
+```bash
+curl -L 'https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model.onnx' \
+  -o ~/.cache/memvid/text-models/nomic-embed-text-v1.5.onnx
+curl -L 'https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json' \
+  -o ~/.cache/memvid/text-models/nomic-embed-text-v1.5_tokenizer.json
+```
+
+**GTE-large** (1024 dimensiones):
+```bash
+curl -L 'https://huggingface.co/thenlper/gte-large/resolve/main/onnx/model.onnx' \
+  -o ~/.cache/memvid/text-models/gte-large.onnx
+curl -L 'https://huggingface.co/thenlper/gte-large/resolve/main/tokenizer.json' \
+  -o ~/.cache/memvid/text-models/gte-large_tokenizer.json
+```
+
+### Uso en código
+
+```rust
+use memvid_core::text_embed::{LocalTextEmbedder, TextEmbedConfig};
+use memvid_core::types::embedding::EmbeddingProvider;
+
+// Usar el modelo por defecto (BGE-small)
+let config = TextEmbedConfig::default();
+let embedder = LocalTextEmbedder::new(config)?;
+
+let embedding = embedder.embed_text("hello world")?;
+assert_eq!(embedding.len(), 384);
+
+// Usar un modelo distinto
+let config = TextEmbedConfig::bge_base();
+let embedder = LocalTextEmbedder::new(config)?;
+```
+
+Consulta `examples/text_embedding.rs` para ver un ejemplo completo con cálculo de similitud y ranking de búsqueda.
+
+### Consistencia del modelo
+
+Para evitar mezclar modelos por accidente, por ejemplo consultar un índice BGE-small con embeddings de OpenAI, puedes asociar explícitamente tu instancia de Memvid a un nombre de modelo:
+
+```rust
+// Vincula el índice a un modelo concreto.
+// Si el índice ya fue creado con otro modelo, devolverá un error.
+mem.set_vec_model("bge-small-en-v1.5")?;
+```
+
+Esta vinculación es persistente. Una vez definida, cualquier intento futuro de usar otro nombre de modelo fallará de inmediato con un error `ModelMismatch`.
+
+---
+
+## Embeddings por API (OpenAI)
+
+La feature `api_embed` habilita la generación de embeddings en la nube usando la API de OpenAI.
+
+### Configuración
+
+Define tu clave de API de OpenAI:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### Uso
+
+```rust
+use memvid_core::api_embed::{OpenAIConfig, OpenAIEmbedder};
+use memvid_core::types::embedding::EmbeddingProvider;
+
+// Usar el modelo por defecto (text-embedding-3-small)
+let config = OpenAIConfig::default();
+let embedder = OpenAIEmbedder::new(config)?;
+
+let embedding = embedder.embed_text("hello world")?;
+assert_eq!(embedding.len(), 1536);
+
+// Usar un modelo de mayor calidad
+let config = OpenAIConfig::large();  // text-embedding-3-large (3072 dims)
+let embedder = OpenAIEmbedder::new(config)?;
+```
+
+### Modelos disponibles
+
+| Modelo                   | Dimensiones | Mejor para                       |
+| ------------------------ | ----------- | -------------------------------- |
+| `text-embedding-3-small` | 1536        | Por defecto, más rápido y económico |
+| `text-embedding-3-large` | 3072        | Máxima calidad                   |
+| `text-embedding-ada-002` | 1536        | Modelo heredado                  |
+
+Consulta `examples/openai_embedding.rs` para ver un ejemplo completo.
+
+---
+
 ## Formato de archivo
 
 Todo vive en un único archivo `.mv2`:
@@ -342,7 +487,14 @@ Email: contact@memvid.com
 
 ---
 
+> **Memvid v1 (memoria basada en QR) está obsoleto**
+>
+> Si estás viendo referencias a códigos QR, estás usando información desactualizada.
+>
+> Consulta: https://docs.memvid.com/memvid-v1-deprecation
+
+---
+
 ## Licencia
 
 Apache License 2.0 — consulta el archivo [LICENSE](LICENSE) para más detalles.
-
