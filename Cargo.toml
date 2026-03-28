@@ -154,6 +154,10 @@ required-features = ["api_embed"]
 name = "simd_benchmark"
 required-features = ["simd"]
 
+[[test]]
+name = "evals"
+required-features = ["evals", "lex"]
+
 [[bench]]
 name = "search_precision_benchmark"
 harness = false
