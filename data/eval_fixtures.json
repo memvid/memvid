@@ -1,0 +1,229 @@
+[
+  {
+    "query": "write ahead log crash recovery",
+    "relevant_uris": [
+      "mv2://docs/wal.md",
+      "mv2://docs/crash-safety.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "how does the WAL checkpoint trigger",
+    "relevant_uris": [
+      "mv2://docs/wal.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "single file format mv2 structure",
+    "relevant_uris": [
+      "mv2://docs/file-format.md",
+      "mv2://docs/header.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "header size bytes offset",
+    "relevant_uris": [
+      "mv2://docs/header.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "BM25 full text search tantivy",
+    "relevant_uris": [
+      "mv2://docs/lex-index.md",
+      "mv2://docs/search.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "lexical search index fields uri title content",
+    "relevant_uris": [
+      "mv2://docs/lex-index.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "HNSW vector similarity search approximate nearest neighbour",
+    "relevant_uris": [
+      "mv2://docs/vec-index.md",
+      "mv2://docs/search.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "vector index flat scan threshold",
+    "relevant_uris": [
+      "mv2://docs/vec-index.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "hybrid search reciprocal rank fusion RRF",
+    "relevant_uris": [
+      "mv2://docs/search.md",
+      "mv2://docs/ask.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "sketch simhash pre filter candidate generation",
+    "relevant_uris": [
+      "mv2://docs/sketch.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "SimHash locality sensitive hashing",
+    "relevant_uris": [
+      "mv2://docs/sketch.md",
+      "mv2://docs/search.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "frame immutable append only design",
+    "relevant_uris": [
+      "mv2://docs/frame.md",
+      "mv2://docs/file-format.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "put bytes commit write operation",
+    "relevant_uris": [
+      "mv2://docs/mutation.md",
+      "mv2://docs/wal.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "PutOptions builder uri title tags",
+    "relevant_uris": [
+      "mv2://docs/mutation.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "CLIP image embedding visual search",
+    "relevant_uris": [
+      "mv2://docs/clip.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "Whisper audio transcription feature flag",
+    "relevant_uris": [
+      "mv2://docs/whisper.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "AES-256-GCM encryption capsule mv2e",
+    "relevant_uris": [
+      "mv2://docs/encryption.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "timeline chronological index query",
+    "relevant_uris": [
+      "mv2://docs/timeline.md",
+      "mv2://docs/file-format.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "time travel replay as_of_frame as_of_ts",
+    "relevant_uris": [
+      "mv2://docs/replay.md",
+      "mv2://docs/timeline.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "logic mesh entity relationship NER",
+    "relevant_uris": [
+      "mv2://docs/mesh.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "ACL access control caller identity enforcement",
+    "relevant_uris": [
+      "mv2://docs/acl.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "verify file integrity deep check",
+    "relevant_uris": [
+      "mv2://docs/verify.md",
+      "mv2://docs/doctor.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "Blake3 hash checksum deterministic",
+    "relevant_uris": [
+      "mv2://docs/checksums.md",
+      "mv2://docs/frame.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "zstd lz4 compression frame bytes",
+    "relevant_uris": [
+      "mv2://docs/compression.md",
+      "mv2://docs/frame.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "feature flag conditional compilation cfg",
+    "relevant_uris": [
+      "mv2://docs/features.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "search cursor pagination next page",
+    "relevant_uris": [
+      "mv2://docs/search.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "adaptive retrieval relevance score distribution",
+    "relevant_uris": [
+      "mv2://docs/ask.md",
+      "mv2://docs/search.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "ask RAG retrieval augmented generation context fragments",
+    "relevant_uris": [
+      "mv2://docs/ask.md"
+    ],
+    "grades": [1.0]
+  },
+  {
+    "query": "TOC table of contents footer file format",
+    "relevant_uris": [
+      "mv2://docs/file-format.md",
+      "mv2://docs/header.md"
+    ],
+    "grades": [1.0, 0.5]
+  },
+  {
+    "query": "open create memvid file lock crash safe",
+    "relevant_uris": [
+      "mv2://docs/lifecycle.md",
+      "mv2://docs/wal.md",
+      "mv2://docs/crash-safety.md"
+    ],
+    "grades": [1.0, 0.5, 0.5]
+  }
+]
