@@ -7,6 +7,12 @@ use crate::{
     error::{MemvidError, Result},
 };
 
+/// Safety ceiling on declared time-index track length. A malformed or hostile
+/// `.mv2` can declare an arbitrarily large `bytes_length` in its TOC; without
+/// this cap, `read_track` would allocate proportional capacity before the
+/// later `read_exact` would fail. 16 GiB matches the temporal-index ceiling.
+const MAX_TIME_INDEX_BYTES: u64 = 1 << 34;
+
 /// Raw entry used to build the time index track.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeIndexEntry {
@@ -63,6 +69,12 @@ pub fn read_track<R: Read + Seek>(
     offset: u64,
     length: u64,
 ) -> Result<Vec<TimeIndexEntry>> {
+    if length > MAX_TIME_INDEX_BYTES {
+        return Err(MemvidError::InvalidTimeIndex {
+            reason: "length exceeds supported limit".into(),
+        });
+    }
+
     reader.seek(SeekFrom::Start(offset))?;
 
     let mut magic = [0u8; 4];
@@ -189,6 +201,21 @@ mod tests {
         file.seek(SeekFrom::Start(0)).unwrap();
         let err = read_track(&mut file, 0, length).expect_err("unsorted entries must fail");
         matches!(err, MemvidError::InvalidTimeIndex { .. });
+    }
+
+    #[test]
+    fn read_rejects_oversized_declared_length() {
+        // Hostile or malformed TOC declaring a length above the safety ceiling
+        // must be rejected before any capacity allocation happens.
+        let mut file = tempfile().expect("temp file");
+        let err = read_track(&mut file, 0, MAX_TIME_INDEX_BYTES + 1)
+            .expect_err("oversized length must be rejected");
+        match err {
+            MemvidError::InvalidTimeIndex { reason } => {
+                assert!(reason.contains("length"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected InvalidTimeIndex, got {other:?}"),
+        }
     }
 
     #[test]

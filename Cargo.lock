@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "memvid-core"
-version = "2.0.135"
+version = "2.0.139"
 dependencies = [
  "aes-gcm",
  "argon2",
