@@ -139,6 +139,9 @@ pub mod symspell_cleanup;
 #[cfg(feature = "api_embed")]
 pub mod api_embed;
 
+#[cfg(feature = "lore")]
+pub mod lore;
+
 #[cfg(test)]
 mod tests_lex_flag;
 

@@ -129,6 +129,7 @@ encryption = ["dep:argon2", "dep:aes-gcm", "dep:rand", "dep:zeroize"]
 symspell_cleanup = ["dep:symspell"]
 # API-based embedding providers (OpenAI, Anthropic, etc.) - requires network
 api_embed = ["dep:reqwest"]
+lore = ["dep:reqwest"]
 # SIMD acceleration for vector distance calculations
 simd = ["dep:wide"]
 hnsw_bench = ["dep:hnsw", "dep:rand", "dep:space", "dep:rand_pcg"]
