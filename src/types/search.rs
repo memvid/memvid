@@ -37,6 +37,16 @@ impl Default for SearchEngineKind {
 }
 
 /// Search request accepted by the core; supports lexical, hybrid, and temporal filters.
+///
+/// Implements [`Default`] so callers can use struct-update syntax:
+///
+/// ```rust,ignore
+/// let req = SearchRequest {
+///     query: "my query".into(),
+///     top_k: 5,
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRequest {
     /// Query string (lexical or semantic depending on engine).
@@ -70,8 +80,33 @@ pub struct SearchRequest {
     /// Optional caller identity context used for ACL filtering.
     pub acl_context: Option<AclContext>,
     #[serde(default)]
-    /// ACL evaluation mode (`audit` or `enforce`).
+    /// ACL enforcement mode (`audit` or `enforce`).
     pub acl_enforcement_mode: AclEnforcementMode,
+}
+
+impl Default for SearchRequest {
+    /// Returns a `SearchRequest` with an empty query, `top_k = 10`, `snippet_chars = 200`,
+    /// and all optional fields set to their zero/none values.
+    ///
+    /// Intended for use with struct-update syntax so callers only need to specify the
+    /// fields that differ from these defaults.
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            top_k: 10,
+            snippet_chars: 200,
+            uri: None,
+            scope: None,
+            cursor: None,
+            #[cfg(feature = "temporal_track")]
+            temporal: None,
+            as_of_frame: None,
+            as_of_ts: None,
+            no_sketch: false,
+            acl_context: None,
+            acl_enforcement_mode: AclEnforcementMode::default(),
+        }
+    }
 }
 
 /// A single ranked hit with snippet metadata.
