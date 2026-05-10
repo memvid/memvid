@@ -401,6 +401,14 @@ pub(crate) fn attach_temporal_metadata(memvid: &mut Memvid, hits: &mut [SearchHi
     Ok(())
 }
 
+pub(super) const DEFAULT_DECAY_HALF_LIFE_SECS: f64 = 86400.0;
+
+#[allow(clippy::cast_possible_truncation)]
+pub(super) fn recency_boost(age_seconds: f32, half_life_secs: f64) -> f32 {
+    let decay_factor = (2.0_f64.ln() / half_life_secs) as f32;
+    (-decay_factor * age_seconds).exp()
+}
+
 /// Enrich search hits with entities from the Logic-Mesh.
 ///
 /// For each hit, looks up entities that are associated with the hit's frame.
@@ -426,5 +434,44 @@ pub(super) fn enrich_hits_with_entities(hits: &mut [SearchHit], memvid: &Memvid)
             let metadata = hit.metadata.get_or_insert_with(SearchHitMetadata::default);
             metadata.entities = entities;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recency_boost_at_zero_age() {
+        let boost = recency_boost(0.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn recency_boost_at_half_life() {
+        let boost = recency_boost(86400.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn recency_boost_at_two_half_lives() {
+        let boost = recency_boost(172_800.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 0.25).abs() < 0.01);
+    }
+
+    #[test]
+    fn recency_boost_monotonically_decreasing() {
+        let b1 = recency_boost(0.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        let b2 = recency_boost(3600.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        let b3 = recency_boost(86400.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!(b1 > b2);
+        assert!(b2 > b3);
+    }
+
+    #[test]
+    fn shorter_half_life_decays_faster() {
+        let slow = recency_boost(3600.0, 86400.0);
+        let fast = recency_boost(3600.0, 3600.0);
+        assert!(slow > fast);
     }
 }

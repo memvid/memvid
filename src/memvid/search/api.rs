@@ -282,6 +282,7 @@ impl Memvid {
             scope,
             None,
             AclEnforcementMode::Audit,
+            None,
         )
     }
 
@@ -295,6 +296,7 @@ impl Memvid {
         scope: Option<&str>,
         acl_context: Option<&AclContext>,
         acl_enforcement_mode: AclEnforcementMode,
+        decay_half_life_secs: Option<f64>,
     ) -> Result<crate::types::SearchResponse> {
         use super::helpers::{build_context, timestamp_to_rfc3339};
         use crate::types::{
@@ -364,13 +366,12 @@ impl Memvid {
             });
         }
 
-        // Convert VecSearchHit to SearchHit with full metadata
-        let mut hits = Vec::new();
+        // Convert VecSearchHit to SearchHit with full metadata, collecting
+        // timestamps for recency decay reranking.
+        let mut candidates: Vec<(i64, SearchHit)> = Vec::new();
         let snippet_limit = snippet_chars.max(80);
 
         for vec_hit in vec_hits {
-            // Apply scope filter if provided
-            // Apply scope filter if provided
             let frame_idx = if let Ok(idx) = usize::try_from(vec_hit.frame_id) {
                 idx
             } else {
@@ -390,7 +391,6 @@ impl Memvid {
                 }
             }
 
-            // Get frame content for snippet
             let content = match self.frame_content(&frame) {
                 Ok(c) => c,
                 Err(_) => continue,
@@ -408,8 +408,6 @@ impl Memvid {
                 .clone()
                 .or_else(|| crate::infer_title_from_uri(&uri));
 
-            // VecIndex returns distance (lower is better), convert back to similarity (higher is better)
-            // distance = 1.0 - similarity, so similarity = 1.0 - distance
             let similarity_score = 1.0 - vec_hit.distance;
 
             let metadata = SearchHitMetadata {
@@ -425,24 +423,64 @@ impl Memvid {
                 temporal: None,
             };
 
-            hits.push(SearchHit {
-                rank: hits.len() + 1,
-                frame_id: vec_hit.frame_id,
-                uri,
-                title,
-                range: (0, snippet_bytes),
-                text: snippet.clone(),
-                matches: 1,
-                chunk_range: Some((0, snippet_bytes)),
-                chunk_text: Some(snippet),
-                score: Some(similarity_score),
-                metadata: Some(metadata),
-            });
+            let ts = frame.timestamp;
 
-            if hits.len() >= top_k {
-                break;
-            }
+            candidates.push((
+                ts,
+                SearchHit {
+                    rank: candidates.len() + 1,
+                    frame_id: vec_hit.frame_id,
+                    uri,
+                    title,
+                    range: (0, snippet_bytes),
+                    text: snippet.clone(),
+                    matches: 1,
+                    chunk_range: Some((0, snippet_bytes)),
+                    chunk_text: Some(snippet),
+                    score: Some(similarity_score),
+                    metadata: Some(metadata),
+                },
+            ));
         }
+
+        // Apply recency decay: re-sort by combined score (similarity + recency)
+        if candidates.len() > 1 {
+            let half_life =
+                decay_half_life_secs.unwrap_or(super::helpers::DEFAULT_DECAY_HALF_LIFE_SECS);
+            let max_ts = candidates.iter().map(|(ts, _)| *ts).max().unwrap_or(0);
+
+            let mut scored: Vec<(f32, SearchHit)> = candidates
+                .into_iter()
+                .map(|(ts, hit)| {
+                    let similarity = hit.score.unwrap_or(0.0);
+                    #[allow(clippy::cast_precision_loss)]
+                    let age_seconds = (max_ts - ts).max(0) as f32;
+                    let boost = super::helpers::recency_boost(age_seconds, half_life);
+                    let combined = similarity * 0.4 + (similarity * boost * 0.6);
+                    (combined, hit)
+                })
+                .collect();
+
+            scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+            candidates = scored
+                .into_iter()
+                .map(|(score, mut hit)| {
+                    hit.score = Some(score);
+                    (0, hit)
+                })
+                .collect();
+        }
+
+        let mut hits: Vec<SearchHit> = candidates
+            .into_iter()
+            .take(top_k)
+            .enumerate()
+            .map(|(idx, (_, mut hit))| {
+                hit.rank = idx + 1;
+                hit
+            })
+            .collect();
 
         let elapsed_ms = start_time.elapsed().as_millis();
 
@@ -505,6 +543,7 @@ impl Memvid {
             scope,
             None,
             AclEnforcementMode::Audit,
+            None,
         )
     }
 
@@ -518,6 +557,7 @@ impl Memvid {
         scope: Option<&str>,
         acl_context: Option<&AclContext>,
         acl_enforcement_mode: AclEnforcementMode,
+        decay_half_life_secs: Option<f64>,
     ) -> Result<AdaptiveResult<SearchHit>> {
         use std::time::Instant;
 
@@ -531,6 +571,7 @@ impl Memvid {
                 scope,
                 acl_context,
                 acl_enforcement_mode,
+                decay_half_life_secs,
             )?;
             return Ok(AdaptiveResult {
                 results: response.hits,
@@ -557,6 +598,7 @@ impl Memvid {
             scope,
             acl_context,
             acl_enforcement_mode,
+            decay_half_life_secs,
         )?;
 
         if response.hits.is_empty() {
