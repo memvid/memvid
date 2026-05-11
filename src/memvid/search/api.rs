@@ -443,44 +443,10 @@ impl Memvid {
             ));
         }
 
-        // Apply recency decay: re-sort by combined score (similarity + recency)
-        if candidates.len() > 1 {
-            let half_life =
-                decay_half_life_secs.unwrap_or(super::helpers::DEFAULT_DECAY_HALF_LIFE_SECS);
-            let max_ts = candidates.iter().map(|(ts, _)| *ts).max().unwrap_or(0);
-
-            let mut scored: Vec<(f32, SearchHit)> = candidates
-                .into_iter()
-                .map(|(ts, hit)| {
-                    let similarity = hit.score.unwrap_or(0.0);
-                    #[allow(clippy::cast_precision_loss)]
-                    let age_seconds = (max_ts - ts).max(0) as f32;
-                    let boost = super::helpers::recency_boost(age_seconds, half_life);
-                    let combined = similarity * 0.4 + (similarity * boost * 0.6);
-                    (combined, hit)
-                })
-                .collect();
-
-            scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-
-            candidates = scored
-                .into_iter()
-                .map(|(score, mut hit)| {
-                    hit.score = Some(score);
-                    (0, hit)
-                })
-                .collect();
-        }
-
-        let mut hits: Vec<SearchHit> = candidates
-            .into_iter()
-            .take(top_k)
-            .enumerate()
-            .map(|(idx, (_, mut hit))| {
-                hit.rank = idx + 1;
-                hit
-            })
-            .collect();
+        let half_life =
+            decay_half_life_secs.unwrap_or(super::helpers::DEFAULT_DECAY_HALF_LIFE_SECS);
+        let mut hits = super::helpers::apply_recency_decay(candidates, half_life);
+        hits.truncate(top_k);
 
         let elapsed_ms = start_time.elapsed().as_millis();
 
