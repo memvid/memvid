@@ -296,7 +296,7 @@ impl Memvid {
         scope: Option<&str>,
         acl_context: Option<&AclContext>,
         acl_enforcement_mode: AclEnforcementMode,
-        decay_half_life_secs: Option<f64>,
+        decay_half_life_secs: Option<f32>,
     ) -> Result<crate::types::SearchResponse> {
         use super::helpers::{build_context, timestamp_to_rfc3339};
         use crate::types::{
@@ -557,7 +557,7 @@ impl Memvid {
         scope: Option<&str>,
         acl_context: Option<&AclContext>,
         acl_enforcement_mode: AclEnforcementMode,
-        decay_half_life_secs: Option<f64>,
+        decay_half_life_secs: Option<f32>,
     ) -> Result<AdaptiveResult<SearchHit>> {
         use std::time::Instant;
 

@@ -84,7 +84,7 @@ pub struct AskRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Half-life in seconds for recency decay on vector search results.
     /// Defaults to 86400 (1 day).
-    pub vec_decay_half_life_secs: Option<f64>,
+    pub vec_decay_half_life_secs: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

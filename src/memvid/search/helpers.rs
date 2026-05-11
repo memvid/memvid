@@ -401,11 +401,10 @@ pub(crate) fn attach_temporal_metadata(memvid: &mut Memvid, hits: &mut [SearchHi
     Ok(())
 }
 
-pub(super) const DEFAULT_DECAY_HALF_LIFE_SECS: f64 = 86400.0;
+pub(super) const DEFAULT_DECAY_HALF_LIFE_SECS: f32 = 86400.0;
 
-#[allow(clippy::cast_possible_truncation)]
-pub(super) fn recency_boost(age_seconds: f32, half_life_secs: f64) -> f32 {
-    let decay_factor = (2.0_f64.ln() / half_life_secs) as f32;
+pub(super) fn recency_boost(age_seconds: f32, half_life_secs: f32) -> f32 {
+    let decay_factor = 2.0_f32.ln() / half_life_secs;
     (-decay_factor * age_seconds).exp()
 }
 
