@@ -372,6 +372,7 @@ impl Memvid {
         let snippet_limit = snippet_chars.max(80);
 
         for vec_hit in vec_hits {
+            // Apply scope filter if provided
             let frame_idx = if let Ok(idx) = usize::try_from(vec_hit.frame_id) {
                 idx
             } else {
@@ -391,6 +392,7 @@ impl Memvid {
                 }
             }
 
+            // Get frame content for snippet
             let content = match self.frame_content(&frame) {
                 Ok(c) => c,
                 Err(_) => continue,
@@ -408,6 +410,8 @@ impl Memvid {
                 .clone()
                 .or_else(|| crate::infer_title_from_uri(&uri));
 
+            // VecIndex returns distance (lower is better), convert back to similarity (higher is better)
+            // distance = 1.0 - similarity, so similarity = 1.0 - distance
             let similarity_score = 1.0 - vec_hit.distance;
 
             let metadata = SearchHitMetadata {

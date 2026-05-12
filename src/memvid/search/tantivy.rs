@@ -198,31 +198,24 @@ pub(super) fn try_tantivy_search(
         evaluated.push((hit, occurrences, slices, chunk_info, effective_ts));
     }
 
-    // Apply recency boosting: re-sort by combined score (BM25 + recency)
-    // This helps knowledge-update questions find the most recent information
     if evaluated.len() > 1 {
-        // Use RELATIVE recency within the result set, not absolute time from "now"
-        // This ensures documents from different time periods are fairly compared
         let max_ts = evaluated
             .iter()
             .map(|(_, _, _, _, ts)| *ts)
             .max()
             .unwrap_or(0);
 
-        // Calculate recency-boosted scores and attach to items
         let mut with_scores: Vec<(f32, _)> = evaluated
             .into_iter()
             .map(|(hit, occurrences, slices, chunk_info, timestamp)| {
                 let bm25_score = hit.score;
-                // Age relative to the most recent document in results
                 #[allow(clippy::cast_precision_loss)]
                 let age_seconds = (max_ts - timestamp).max(0) as f32;
-                // Decay factor: half-life of ~1 day for aggressive recency preference
-                // This ensures even a few days difference has significant impact
-                let decay_factor = 0.00000802; // ln(2) / 86400 (1 day)
-                let recency_boost = (-decay_factor * age_seconds).exp();
-                // Combine: 40% BM25 + 60% recency boost - strongly prefer recent
-                let combined_score = bm25_score * 0.4 + (bm25_score * recency_boost * 0.6);
+                let boost = super::helpers::recency_boost(
+                    age_seconds,
+                    super::helpers::DEFAULT_DECAY_HALF_LIFE_SECS,
+                );
+                let combined_score = bm25_score * 0.4 + (bm25_score * boost * 0.6);
                 (
                     combined_score,
                     (hit, occurrences, slices, chunk_info, timestamp),
@@ -230,10 +223,7 @@ pub(super) fn try_tantivy_search(
             })
             .collect();
 
-        // Sort by combined score (descending)
         with_scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Extract back to evaluated
         evaluated = with_scores.into_iter().map(|(_, item)| item).collect();
     }
 
