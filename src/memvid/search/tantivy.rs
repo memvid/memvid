@@ -198,7 +198,11 @@ pub(super) fn try_tantivy_search(
         evaluated.push((hit, occurrences, slices, chunk_info, effective_ts));
     }
 
+    // Apply recency boosting: re-sort by combined score (BM25 + recency).
+    // This helps knowledge-update questions find the most recent information.
     if evaluated.len() > 1 {
+        // Use RELATIVE recency within the result set, not absolute time from "now".
+        // This ensures documents from different time periods are fairly compared.
         let max_ts = evaluated
             .iter()
             .map(|(_, _, _, _, ts)| *ts)
