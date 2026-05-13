@@ -1,23 +1,22 @@
 <!-- HEADER:START -->
-<img width="2000" height="524" alt="Social Cover (9)" src="https://github.com/user-attachments/assets/cf66f045-c8be-494b-b696-b8d7e4fb709c" />
+<img width="2000" height="524" alt="Social Cover (9)"
+     src="https://github.com/user-attachments/assets/cf66f045-c8be-494b-b696-b8d7e4fb709c" />
 <!-- HEADER:END -->
 
-<!-- FLAGS:START -->
+<div style="height: 16px;"></div>
+
+# المساهمة في Memvid (الترجمة العربية)
+
 <p align="center">
- <a href="../../README.md">🇺🇸 English</a>
- <a href="README.es.md">🇪🇸 Español</a>
- <a href="README.fr.md">🇫🇷 Français</a>
- <a href="README.so.md">🇸🇴 Soomaali</a>
- <a href="README.ar.md">🇸🇦 العربية</a>
- <a href="README.nl.md">🇧🇪/🇳🇱 Nederlands</a>
- <a href="README.hi.md">🇮🇳 हिन्दी</a>
- <a href="README.bn.md">🇧🇩 বাংলা</a>
- <a href="README.cs.md">🇨🇿 Čeština</a>
- <a href="README.ko.md">🇰🇷 한국어</a>
- <a href="README.ja.md">🇯🇵 日本語</a>
- <!-- Next Flag -->
+    <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
-<!-- FLAGS:END -->
+
+<p align="center">
+<strong>Memvid هي طبقة ذاكرة مكونة من ملف واحد لوكلاء الذكاء الاصطناعي (AI Agents)، توفر استرجاعاً فورياً وذاكرة طويلة المدى.</strong>
+
+ذاكرة دائمة، مؤرشفة، وقابلة للنقل، دون الحاجة إلى قواعد بيانات.
+
+</p>
 
 <!-- NAV:START -->
 <p align="center">
@@ -28,6 +27,8 @@
   <a href="https://docs.memvid.com">Docs</a>
   ·
   <a href="https://github.com/memvid/memvid/discussions">Discussions</a>
+  ·
+  <a href="docs/i18n/translation_hub.md">Translations</a>
 </p>
 <!-- NAV:END -->
 
@@ -44,20 +45,7 @@
   <a href="https://github.com/memvid/memvid/issues"><img src="https://img.shields.io/github/issues/memvid/memvid?style=flat-square&logo=github" alt="Issues" /></a>
   <a href="https://discord.gg/2mynS7fcK7"><img src="https://img.shields.io/discord/1442910055233224745?style=flat-square&logo=discord&label=discord" alt="Discord" /></a>
 </p>
-
-<p align="center">
-    <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
 <!-- BADGES:END -->
-
-# المساهمة في Memvid (الترجمة العربية)
-
-<p align="center">
-<strong>Memvid هي طبقة ذاكرة مكونة من ملف واحد لوكلاء الذكاء الاصطناعي (AI Agents)، توفر استرجاعاً فورياً وذاكرة طويلة المدى.</strong>
-
-ذاكرة دائمة، مؤرشفة، وقابلة للنقل، دون الحاجة إلى قواعد بيانات.
-
-</p>
 
 <h2 align="center">⭐️ اترك نجمة (STAR) لدعم المشروع ⭐️</h2>
 
