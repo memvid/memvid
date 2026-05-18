@@ -73,6 +73,7 @@ impl Memvid {
             adaptive: None,
             acl_context: None,
             acl_enforcement_mode: crate::types::AclEnforcementMode::Audit,
+            vec_decay_half_life_secs: None,
         };
 
         let response = self.ask(request, embedder)?;

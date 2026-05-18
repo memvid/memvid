@@ -401,6 +401,48 @@ pub(crate) fn attach_temporal_metadata(memvid: &mut Memvid, hits: &mut [SearchHi
     Ok(())
 }
 
+pub(super) const DEFAULT_DECAY_HALF_LIFE_SECS: f32 = 86400.0;
+
+pub(super) fn recency_boost(age_seconds: f32, half_life_secs: f32) -> f32 {
+    let decay_factor = 2.0_f32.ln() / half_life_secs;
+    (-decay_factor * age_seconds).exp()
+}
+
+pub(super) fn apply_recency_decay(
+    candidates: Vec<(i64, SearchHit)>,
+    half_life_secs: f32,
+) -> Vec<SearchHit> {
+    if candidates.len() <= 1 {
+        return candidates.into_iter().map(|(_, hit)| hit).collect();
+    }
+
+    let max_ts = candidates.iter().map(|(ts, _)| *ts).max().unwrap_or(0);
+
+    let mut scored: Vec<(f32, SearchHit)> = candidates
+        .into_iter()
+        .map(|(ts, hit)| {
+            let similarity = hit.score.unwrap_or(0.0);
+            #[allow(clippy::cast_precision_loss)]
+            let age_seconds = (max_ts - ts).max(0) as f32;
+            let boost = recency_boost(age_seconds, half_life_secs);
+            let combined = similarity * 0.4 + (similarity * boost * 0.6);
+            (combined, hit)
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    scored
+        .into_iter()
+        .enumerate()
+        .map(|(idx, (score, mut hit))| {
+            hit.score = Some(score);
+            hit.rank = idx + 1;
+            hit
+        })
+        .collect()
+}
+
 /// Enrich search hits with entities from the Logic-Mesh.
 ///
 /// For each hit, looks up entities that are associated with the hit's frame.
@@ -426,5 +468,120 @@ pub(super) fn enrich_hits_with_entities(hits: &mut [SearchHit], memvid: &Memvid)
             let metadata = hit.metadata.get_or_insert_with(SearchHitMetadata::default);
             metadata.entities = entities;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recency_boost_at_zero_age() {
+        let boost = recency_boost(0.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn recency_boost_at_half_life() {
+        let boost = recency_boost(86400.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn recency_boost_at_two_half_lives() {
+        let boost = recency_boost(172_800.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!((boost - 0.25).abs() < 0.01);
+    }
+
+    #[test]
+    fn recency_boost_monotonically_decreasing() {
+        let b1 = recency_boost(0.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        let b2 = recency_boost(3600.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        let b3 = recency_boost(86400.0, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!(b1 > b2);
+        assert!(b2 > b3);
+    }
+
+    #[test]
+    fn shorter_half_life_decays_faster() {
+        let slow = recency_boost(3600.0, 86400.0);
+        let fast = recency_boost(3600.0, 3600.0);
+        assert!(slow > fast);
+    }
+
+    fn hit(frame_id: u64, score: f32) -> SearchHit {
+        SearchHit {
+            rank: 0,
+            frame_id,
+            uri: String::new(),
+            title: None,
+            range: (0, 0),
+            text: String::new(),
+            matches: 0,
+            chunk_range: None,
+            chunk_text: None,
+            score: Some(score),
+            metadata: None,
+        }
+    }
+
+    #[test]
+    fn decay_promotes_recent_over_distant() {
+        let now = 1_700_000_000_i64;
+        let candidates = vec![(now - 86400 * 7, hit(1, 0.9)), (now, hit(2, 0.85))];
+        let result = apply_recency_decay(candidates, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert_eq!(result[0].frame_id, 2, "recent hit should rank first");
+        assert_eq!(result[0].rank, 1);
+        assert_eq!(result[1].rank, 2);
+    }
+
+    #[test]
+    fn decay_preserves_order_when_timestamps_equal() {
+        let ts = 1_700_000_000_i64;
+        let candidates = vec![(ts, hit(1, 0.9)), (ts, hit(2, 0.7)), (ts, hit(3, 0.5))];
+        let result = apply_recency_decay(candidates, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert_eq!(result[0].frame_id, 1);
+        assert_eq!(result[1].frame_id, 2);
+        assert_eq!(result[2].frame_id, 3);
+    }
+
+    #[test]
+    fn decay_single_candidate_passes_through() {
+        let candidates = vec![(1_700_000_000, hit(42, 0.8))];
+        let result = apply_recency_decay(candidates, DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].frame_id, 42);
+    }
+
+    #[test]
+    fn decay_empty_input() {
+        let result = apply_recency_decay(Vec::new(), DEFAULT_DECAY_HALF_LIFE_SECS);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn decay_shorter_half_life_is_more_aggressive() {
+        let now = 1_700_000_000_i64;
+        let candidates_long = vec![(now - 86400, hit(1, 0.95)), (now, hit(2, 0.7))];
+        let candidates_short = vec![(now - 86400, hit(1, 0.95)), (now, hit(2, 0.7))];
+        let long_result = apply_recency_decay(candidates_long, 86400.0 * 30.0);
+        let short_result = apply_recency_decay(candidates_short, 3600.0);
+
+        let old_score_long = long_result
+            .iter()
+            .find(|h| h.frame_id == 1)
+            .unwrap()
+            .score
+            .unwrap();
+        let old_score_short = short_result
+            .iter()
+            .find(|h| h.frame_id == 1)
+            .unwrap()
+            .score
+            .unwrap();
+        assert!(
+            old_score_long > old_score_short,
+            "longer half-life should penalize old hits less"
+        );
     }
 }
