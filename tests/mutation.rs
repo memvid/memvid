@@ -3,10 +3,22 @@
 
 use memvid_core::{
     EmbeddingIdentitySummary, MEMVID_EMBEDDING_MODEL_KEY, MEMVID_EMBEDDING_PROVIDER_KEY, Memvid,
-    MemvidError, PutOptions, TimelineQuery,
+    MemvidError, PutOptions, TimelineQuery, constants::HEADER_SIZE, io::header::HeaderCodec,
 };
+use std::fs::File;
+use std::io::Read;
 use std::num::NonZeroU64;
+use std::path::Path;
 use tempfile::TempDir;
+
+fn read_wal_size(path: &Path) -> u64 {
+    let mut header_bytes = [0u8; HEADER_SIZE];
+    File::open(path)
+        .unwrap()
+        .read_exact(&mut header_bytes)
+        .unwrap();
+    HeaderCodec::decode(&header_bytes).unwrap().wal_size
+}
 
 /// Test basic put operation with bytes.
 #[test]
@@ -433,4 +445,74 @@ fn timeline_iteration() {
     let entries = mem.timeline(query).unwrap();
 
     assert_eq!(entries.len(), 3, "Should have 3 timeline entries");
+}
+
+/// Regression test for memvid/memvid#230 — sustained commit-per-put workloads
+/// that span multiple WAL growth cycles must keep the embedded WAL intact.
+///
+/// Before the fix, `grow_wal_region` / `ensure_wal_capacity` updated
+/// `header.footer_offset` and `self.data_end` after shifting the data region
+/// but left the cached `payload_region_end()` value stale. The next call to
+/// `rebuild_indexes` then sought to that pre-growth offset (which now lies
+/// inside the grown WAL region) and overwrote WAL record payloads, producing
+/// `Embedded WAL is corrupted at offset N: wal record checksum mismatch` on
+/// the following commit.
+#[test]
+fn commit_per_put_survives_wal_growth() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("wal_growth.mv2");
+
+    let mut mem = Memvid::create(&path).unwrap();
+    let initial_wal_size = read_wal_size(&path);
+    let mut max_wal_size = initial_wal_size;
+
+    // Use text-indexable payloads of varying length so each commit drives the
+    // full Tantivy rebuild path (`rebuild_indexes` → `flush_tantivy`) that
+    // seeks to `payload_region_end()`. The mix of sizes ensures multiple
+    // WAL growth cycles occur across the run.
+    let words: &[&str] = &[
+        "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india",
+        "juliet", "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo", "sierra",
+        "tango", "uniform", "victor", "whiskey", "x-ray", "yankee", "zulu",
+    ];
+
+    for i in 0..60u32 {
+        // Build a ~1-3 KiB text body so commits exercise variable-size WAL
+        // entries similar to the upstream repro.
+        let body_len = 256usize + ((i as usize * 137) % 1024);
+        let mut body = String::with_capacity(body_len * 8);
+        let mut idx = i as usize;
+        while body.len() < body_len {
+            body.push_str(words[idx % words.len()]);
+            body.push(' ');
+            idx = idx.wrapping_add(1);
+        }
+        let opts = PutOptions {
+            uri: Some(format!("mv2://wal-growth/doc-{i}")),
+            title: Some(format!("doc-{i}")),
+            search_text: Some(body.clone()),
+            ..Default::default()
+        };
+        mem.put_bytes_with_options(body.as_bytes(), opts)
+            .unwrap_or_else(|e| panic!("put #{i} failed: {e}"));
+        mem.commit()
+            .unwrap_or_else(|e| panic!("commit #{i} failed: {e}"));
+        max_wal_size = max_wal_size.max(read_wal_size(&path));
+    }
+
+    assert!(
+        max_wal_size > initial_wal_size,
+        "test must exercise WAL growth (initial={initial_wal_size}, max={max_wal_size})"
+    );
+
+    drop(mem);
+
+    // Reopening forces a full WAL scan; checksum verification will fire here
+    // if any record payload was clobbered by a stale-offset index write.
+    let reopened = Memvid::open_read_only(&path).unwrap();
+    assert_eq!(
+        reopened.stats().unwrap().frame_count,
+        60,
+        "all puts should be durable after WAL growth"
+    );
 }
