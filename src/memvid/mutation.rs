@@ -607,9 +607,7 @@ impl Memvid {
 
         self.shift_data_for_wal_growth(delta)?;
         self.header.wal_size = new_size;
-        self.header.footer_offset = self.header.footer_offset.saturating_add(delta);
-        self.data_end = self.data_end.saturating_add(delta);
-        self.adjust_offsets_after_wal_growth(delta);
+        self.apply_wal_growth_offsets(delta);
 
         let catalog_end = self.catalog_data_end();
         self.header.footer_offset = catalog_end
@@ -657,6 +655,24 @@ impl Memvid {
             remaining -= write;
         }
         Ok(())
+    }
+
+    fn apply_wal_growth_offsets(&mut self, delta: u64) {
+        if delta == 0 {
+            return;
+        }
+
+        self.header.footer_offset = self.header.footer_offset.saturating_add(delta);
+        self.data_end = self.data_end.saturating_add(delta);
+        // `cached_payload_end` mirrors `data_end` / footer positioning. After
+        // `shift_data_for_wal_growth` every byte past the old WAL boundary
+        // moved right by `delta`, so the cached payload boundary must also
+        // advance. Forgetting this caused `rebuild_indexes` (which seeks to
+        // `payload_region_end()`) to write embedded indexes back into the
+        // grown portion of the WAL region, corrupting WAL record payloads.
+        // See https://github.com/memvid/memvid/issues/230.
+        self.cached_payload_end = self.cached_payload_end.saturating_add(delta);
+        self.adjust_offsets_after_wal_growth(delta);
     }
 
     fn adjust_offsets_after_wal_growth(&mut self, delta: u64) {
@@ -801,9 +817,7 @@ impl Memvid {
 
         self.shift_data_for_wal_growth(delta)?;
         self.header.wal_size = target;
-        self.header.footer_offset = self.header.footer_offset.saturating_add(delta);
-        self.data_end = self.data_end.saturating_add(delta);
-        self.adjust_offsets_after_wal_growth(delta);
+        self.apply_wal_growth_offsets(delta);
 
         let catalog_end = self.catalog_data_end();
         self.header.footer_offset = catalog_end
