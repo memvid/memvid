@@ -107,6 +107,10 @@ pub mod simd;
 #[cfg(feature = "vec")]
 pub mod text_embed;
 
+/// offline search quality eval using ndcg scoring
+#[cfg(feature = "evals")]
+pub mod evals;
+
 // Triplet extraction module for automatic SPO extraction during ingestion
 pub mod triplet;
 
