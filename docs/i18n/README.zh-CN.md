@@ -8,7 +8,6 @@
 <p align="center">
     <a href="https://trendshift.io/repositories/17293" target="_blank"><img src="https://trendshift.io/api/badge/repositories/17293" alt="memvid%2Fmemvid | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
-<!-- BADGES:END -->
 
 <p align="center">
   <strong>Memvid 是专为 AI 智能体设计的单文件记忆层，具备即时检索和长期记忆能力。</strong><br/>
@@ -24,6 +23,8 @@
   <a href="https://docs.memvid.com">文档</a>
   ·
   <a href="https://github.com/memvid/memvid/discussions">讨论区</a>
+  ·
+  <a href="docs/i18n/translation_hub.md">Translations</a>
 </p>
 <!-- NAV:END -->
 
@@ -40,8 +41,7 @@
   <a href="https://github.com/memvid/memvid/issues"><img src="https://img.shields.io/github/issues/memvid/memvid?style=flat-square&logo=github" alt="Issues" /></a>
   <a href="https://discord.gg/2mynS7fcK7"><img src="https://img.shields.io/discord/1442910055233224745?style=flat-square&logo=discord&label=discord" alt="Discord" /></a>
 </p>
-
-
+<!-- BADGES:END -->
 
 <h2 align="center">⭐️ 给项目点个星标支持我们 ⭐️</h2>
 
