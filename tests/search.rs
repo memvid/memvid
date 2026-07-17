@@ -125,6 +125,54 @@ fn search_multiple_results() {
     );
 }
 
+/// Test quoted search requires the exact phrase, not just all words.
+#[test]
+#[cfg(feature = "lex")]
+fn search_quoted_phrase_requires_exact_match() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.mv2");
+
+    {
+        let mut mem = Memvid::create(&path).unwrap();
+        mem.enable_lex().unwrap();
+
+        for (uri, content) in [
+            ("mv2://exact", "quantum mechanics is weird"),
+            ("mv2://separate", "quantum effects differ from classical mechanics"),
+        ] {
+            let opts = PutOptions {
+                uri: Some(uri.to_string()),
+                search_text: Some(content.to_string()),
+                ..Default::default()
+            };
+            mem.put_bytes_with_options(content.as_bytes(), opts).unwrap();
+        }
+        mem.commit().unwrap();
+    }
+
+    let mut mem = Memvid::open_read_only(&path).unwrap();
+    let results = mem
+        .search(SearchRequest {
+            query: "\"quantum mechanics\"".to_string(),
+            top_k: 10,
+            snippet_chars: 200,
+            uri: None,
+            scope: None,
+            cursor: None,
+            #[cfg(feature = "temporal_track")]
+            temporal: None,
+            as_of_frame: None,
+            as_of_ts: None,
+            no_sketch: false,
+            acl_context: None,
+            acl_enforcement_mode: memvid_core::types::AclEnforcementMode::Audit,
+        })
+        .unwrap();
+
+    assert_eq!(results.hits.len(), 1);
+    assert_eq!(results.hits[0].uri, "mv2://exact");
+}
+
 /// Test search with top_k limit.
 #[test]
 #[cfg(feature = "lex")]
