@@ -138,13 +138,12 @@ impl EmbeddedLexStorage {
         (index_manifest, segments)
     }
 
-    pub fn adjust_offsets(&mut self, delta: u64) {
-        if delta == 0 {
-            return;
-        }
+    /// Apply `f` to every non-zero segment offset. Shared by WAL growth
+    /// (offsets shift up) and shrink (offsets shift down).
+    pub fn map_offsets(&mut self, f: impl Fn(u64) -> u64) {
         for segment in self.segments.values_mut() {
             if segment.bytes_offset != 0 {
-                segment.bytes_offset += delta;
+                segment.bytes_offset = f(segment.bytes_offset);
             }
         }
     }

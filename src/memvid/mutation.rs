@@ -619,6 +619,11 @@ impl Memvid {
         crate::persist_header(&mut self.file, &self.header)?;
         self.file.sync_all()?;
         self.wal = EmbeddedWal::open(&self.file, &self.header)?;
+        // The reopen resets skip_sync; a mid-batch growth must keep the
+        // batch's fsync mode or every later append pays a full fsync.
+        if let Some(opts) = &self.batch_opts {
+            self.wal.set_skip_sync(opts.skip_sync);
+        }
         Ok(())
     }
 
@@ -657,6 +662,84 @@ impl Memvid {
         Ok(())
     }
 
+    /// Shrink the embedded WAL region to `target_bytes` (rounded up to a
+    /// power of two, floored at [`WAL_SIZE_MEDIUM`]), reclaiming space a
+    /// bulk build reserved or grew into. The WAL region persists at its
+    /// high-water mark otherwise.
+    ///
+    /// Requires a fully-checkpointed WAL (call [`commit()`](Self::commit)
+    /// first); refuses otherwise, since pending records would be
+    /// destroyed. Everything after the WAL shifts DOWN — the exact mirror
+    /// of the growth path — and the file truncates.
+    pub fn shrink_wal_to(&mut self, target_bytes: u64) -> Result<()> {
+        self.ensure_writable()?;
+        // Pending records first: shrinking mid-ingest is a caller bug even
+        // when the target would make this a no-op.
+        if !self.wal.pending_records()?.is_empty() {
+            return Err(MemvidError::CheckpointFailed {
+                reason: "cannot shrink WAL with pending records — commit first".to_owned(),
+            });
+        }
+        let target = target_bytes.max(WAL_SIZE_MEDIUM).next_power_of_two();
+        if target >= self.header.wal_size {
+            return Ok(());
+        }
+
+        let delta = self.header.wal_size - target;
+        self.shift_data_for_wal_shrink(delta)?;
+        self.header.wal_size = target;
+        // The retained head still holds already-checkpointed record bytes
+        // from the larger region; a record straddling the new boundary
+        // would make the reopen scan below misparse them as corruption.
+        // Pending records are empty (checked above), so mark the region
+        // empty and reset the checkpoint position with it.
+        EmbeddedWal::write_empty_sentinel(&mut self.file, &self.header)?;
+        self.header.wal_checkpoint_pos = 0;
+        self.apply_wal_shrink_offsets(delta);
+
+        let catalog_end = self.catalog_data_end();
+        self.header.footer_offset = catalog_end
+            .max(self.header.footer_offset)
+            .max(self.data_end);
+
+        self.rewrite_toc_footer()?;
+        self.header.toc_checksum = self.toc.toc_checksum;
+        crate::persist_header(&mut self.file, &self.header)?;
+        self.file.sync_all()?;
+        self.wal = EmbeddedWal::open(&self.file, &self.header)?;
+        Ok(())
+    }
+
+    /// Move everything after the (shrinking) WAL region down by `delta`
+    /// and truncate. Copies front-to-back — with `dst < src` a forward
+    /// pass never reads bytes it has already overwritten.
+    fn shift_data_for_wal_shrink(&mut self, delta: u64) -> Result<()> {
+        if delta == 0 {
+            return Ok(());
+        }
+        let original_len = self.file.metadata()?.len();
+        let data_start = self.header.wal_offset + self.header.wal_size;
+        let total = original_len.saturating_sub(data_start);
+
+        let mut buffer = vec![0u8; WAL_SHIFT_BUFFER_SIZE];
+        let mut moved = 0u64;
+        while moved < total {
+            let chunk = min(total - moved, buffer.len() as u64);
+            let src = data_start + moved;
+            self.file.seek(SeekFrom::Start(src))?;
+            #[allow(clippy::cast_possible_truncation)]
+            self.file.read_exact(&mut buffer[..chunk as usize])?;
+            let dst = src - delta;
+            self.file.seek(SeekFrom::Start(dst))?;
+            #[allow(clippy::cast_possible_truncation)]
+            self.file.write_all(&buffer[..chunk as usize])?;
+            moved += chunk;
+        }
+
+        self.file.set_len(original_len - delta)?;
+        Ok(())
+    }
+
     fn apply_wal_growth_offsets(&mut self, delta: u64) {
         if delta == 0 {
             return;
@@ -675,81 +758,137 @@ impl Memvid {
         self.adjust_offsets_after_wal_growth(delta);
     }
 
-    fn adjust_offsets_after_wal_growth(&mut self, delta: u64) {
+    /// Exact mirror of [`Self::apply_wal_growth_offsets`]: every byte
+    /// past the WAL boundary moved LEFT by `delta`, so all bookkeeping
+    /// shifts down with it.
+    fn apply_wal_shrink_offsets(&mut self, delta: u64) {
         if delta == 0 {
             return;
         }
 
+        self.header.footer_offset = self.header.footer_offset.saturating_sub(delta);
+        self.data_end = self.data_end.saturating_sub(delta);
+        self.cached_payload_end = self.cached_payload_end.saturating_sub(delta);
+        self.adjust_offsets_after_wal_shrink(delta);
+    }
+
+    fn adjust_offsets_after_wal_growth(&mut self, delta: u64) {
+        if delta == 0 {
+            return;
+        }
+        self.map_data_offsets(|offset| offset + delta);
+    }
+
+    fn adjust_offsets_after_wal_shrink(&mut self, delta: u64) {
+        if delta == 0 {
+            return;
+        }
+        self.map_data_offsets(|offset| offset - delta);
+    }
+
+    /// Apply `f` to every stored non-zero data offset — frame payloads,
+    /// index manifests, the segment catalog, and lex storage. WAL growth
+    /// and shrink share this single walk so an offset class can never be
+    /// adjusted in one direction and forgotten in the other.
+    fn map_data_offsets(&mut self, f: impl Fn(u64) -> u64 + Copy) {
         for frame in &mut self.toc.frames {
             if frame.payload_offset != 0 {
-                frame.payload_offset += delta;
+                frame.payload_offset = f(frame.payload_offset);
             }
         }
 
         for segment in &mut self.toc.segments {
             if segment.bytes_offset != 0 {
-                segment.bytes_offset += delta;
+                segment.bytes_offset = f(segment.bytes_offset);
             }
         }
 
         if let Some(lex) = self.toc.indexes.lex.as_mut() {
             if lex.bytes_offset != 0 {
-                lex.bytes_offset += delta;
+                lex.bytes_offset = f(lex.bytes_offset);
             }
         }
         for manifest in &mut self.toc.indexes.lex_segments {
             if manifest.bytes_offset != 0 {
-                manifest.bytes_offset += delta;
+                manifest.bytes_offset = f(manifest.bytes_offset);
             }
         }
         if let Some(vec) = self.toc.indexes.vec.as_mut() {
             if vec.bytes_offset != 0 {
-                vec.bytes_offset += delta;
+                vec.bytes_offset = f(vec.bytes_offset);
+            }
+        }
+        if let Some(clip) = self.toc.indexes.clip.as_mut() {
+            if clip.bytes_offset != 0 {
+                clip.bytes_offset = f(clip.bytes_offset);
             }
         }
         if let Some(time_index) = self.toc.time_index.as_mut() {
             if time_index.bytes_offset != 0 {
-                time_index.bytes_offset += delta;
+                time_index.bytes_offset = f(time_index.bytes_offset);
             }
         }
         #[cfg(feature = "temporal_track")]
         if let Some(track) = self.toc.temporal_track.as_mut() {
             if track.bytes_offset != 0 {
-                track.bytes_offset += delta;
+                track.bytes_offset = f(track.bytes_offset);
+            }
+        }
+        // Post-commit tracks: growth only ever runs mid-batch (before these
+        // exist), but shrink runs after a full commit — miss one and its
+        // offset points past the truncated file.
+        if let Some(track) = self.toc.memories_track.as_mut() {
+            if track.bytes_offset != 0 {
+                track.bytes_offset = f(track.bytes_offset);
+            }
+        }
+        if let Some(mesh) = self.toc.logic_mesh.as_mut() {
+            if mesh.bytes_offset != 0 {
+                mesh.bytes_offset = f(mesh.bytes_offset);
+            }
+        }
+        if let Some(sketch) = self.toc.sketch_track.as_mut() {
+            if sketch.bytes_offset != 0 {
+                sketch.bytes_offset = f(sketch.bytes_offset);
             }
         }
 
         let catalog = &mut self.toc.segment_catalog;
         for descriptor in &mut catalog.lex_segments {
             if descriptor.common.bytes_offset != 0 {
-                descriptor.common.bytes_offset += delta;
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
             }
         }
         for descriptor in &mut catalog.vec_segments {
             if descriptor.common.bytes_offset != 0 {
-                descriptor.common.bytes_offset += delta;
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
             }
         }
         for descriptor in &mut catalog.time_segments {
             if descriptor.common.bytes_offset != 0 {
-                descriptor.common.bytes_offset += delta;
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
             }
         }
         #[cfg(feature = "temporal_track")]
         for descriptor in &mut catalog.temporal_segments {
             if descriptor.common.bytes_offset != 0 {
-                descriptor.common.bytes_offset += delta;
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
             }
         }
         for descriptor in &mut catalog.tantivy_segments {
             if descriptor.common.bytes_offset != 0 {
-                descriptor.common.bytes_offset += delta;
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
+            }
+        }
+        for descriptor in &mut catalog.index_segments {
+            if descriptor.common.bytes_offset != 0 {
+                descriptor.common.bytes_offset = f(descriptor.common.bytes_offset);
             }
         }
 
         #[cfg(feature = "lex")]
         if let Ok(mut storage) = self.lex_storage.write() {
-            storage.adjust_offsets(delta);
+            storage.map_offsets(f);
         }
     }
     pub fn commit_with_options(&mut self, options: CommitOptions) -> Result<()> {
@@ -1333,6 +1472,12 @@ impl Memvid {
                             data_cursor += payload_length;
                             // Keep cached_payload_end in sync (monotonically increasing)
                             self.cached_payload_end = self.cached_payload_end.max(data_cursor);
+                            // Advance data_end immediately: entries with no
+                            // search text are read back from the file later in
+                            // this same replay pass (frame_content for lex
+                            // indexing), and validate_frame_bounds rejects any
+                            // payload past data_end.
+                            self.data_end = self.data_end.max(data_cursor);
                             (
                                 payload_offset,
                                 payload_length,
@@ -2865,6 +3010,13 @@ impl Memvid {
         } else {
             self.tier().capacity_bytes()
         }
+    }
+
+    /// Snapshot of the embedded WAL's state (region size, pending
+    /// bytes, sequence, fsync mode).
+    #[must_use]
+    pub fn wal_stats(&self) -> crate::io::wal::WalStats {
+        self.wal.stats()
     }
 
     /// Get current storage capacity in bytes.

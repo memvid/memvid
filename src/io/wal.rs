@@ -16,6 +16,7 @@ pub struct WalStats {
     pub pending_bytes: u64,
     pub appends_since_checkpoint: u64,
     pub sequence: u64,
+    pub skip_sync: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +41,17 @@ pub struct EmbeddedWal {
 }
 
 impl EmbeddedWal {
+    /// Mark a fully-checkpointed region as empty by writing a zero
+    /// sentinel at its start. Required after the region is resized in
+    /// place: stale record bytes from the previous geometry remain in
+    /// the retained head, and a record straddling the new boundary
+    /// makes the next open's scan misparse them as corruption.
+    pub fn write_empty_sentinel(file: &mut File, header: &Header) -> Result<()> {
+        file.seek(SeekFrom::Start(header.wal_offset))?;
+        file.write_all(&[0u8; ENTRY_HEADER_SIZE])?;
+        Ok(())
+    }
+
     pub fn open(file: &File, header: &Header) -> Result<Self> {
         Self::open_internal(file, header, false)
     }
@@ -211,6 +223,7 @@ impl EmbeddedWal {
             pending_bytes: self.pending_bytes,
             appends_since_checkpoint: self.appends_since_checkpoint,
             sequence: self.sequence,
+            skip_sync: self.skip_sync,
         }
     }
 
