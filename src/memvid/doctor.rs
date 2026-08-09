@@ -1144,7 +1144,7 @@ impl DoctorExecutor {
                     // This ensures a clean slate even if doctor's own operations had WAL issues
                     if let Some(ref mut held) = mem {
                         doctor_log!("doctor: performing final WAL cleanup before verification");
-                        if let Err(err) = Self::reset_wal(held) {
+                        if let Err(err) = held.reset_wal() {
                             doctor_log!("doctor: WARNING - final WAL cleanup failed: {}", err);
                             additional_findings.push(DoctorFinding::warning(
                                 DoctorFindingCode::InternalError,
@@ -1163,7 +1163,7 @@ impl DoctorExecutor {
                         && Self::verification_is_wal_only_failure(&report)
                     {
                         if let Ok(mut reopen) = Memvid::try_open(&path) {
-                            let _ = Self::reset_wal(&mut reopen);
+                            let _ = reopen.reset_wal();
                         }
                         report = Self::run_verification(&path)?;
                         if Self::verification_is_wal_only_failure(&report) {
@@ -1475,7 +1475,7 @@ impl DoctorExecutor {
         // and could potentially corrupt the freshly written footer_offset.
 
         // Reset WAL while preserving the correct footer_offset
-        Self::reset_wal(mem)?;
+        mem.reset_wal()?;
 
         // Verify footer_offset wasn't corrupted
         if mem.header.footer_offset != footer_offset_after_rebuild {
@@ -1497,49 +1497,6 @@ impl DoctorExecutor {
             status: DoctorActionStatus::Executed,
             detail: Some("indexes rebuilt".into()),
         })
-    }
-
-    fn reset_wal(mem: &mut Memvid) -> Result<()> {
-        doctor_log!(
-            "doctor: reset_wal - zeroing {} bytes at offset {}",
-            mem.header.wal_size,
-            mem.header.wal_offset
-        );
-        let mut remaining = mem.header.wal_size;
-        let mut offset = mem.header.wal_offset;
-        let chunk_size = (remaining.min(4096) as usize).max(1);
-        let zeros = vec![0u8; chunk_size];
-        while remaining > 0 {
-            let write_len = usize::try_from(remaining.min(zeros.len() as u64)).unwrap_or(0);
-            mem.file.seek(SeekFrom::Start(offset))?;
-            mem.file.write_all(&zeros[..write_len])?;
-            remaining -= write_len as u64;
-            offset += write_len as u64;
-        }
-        mem.file.sync_all()?;
-        doctor_log!("doctor: reset_wal - WAL region zeroed and synced");
-
-        // CRITICAL: Update and persist header BEFORE reopening WAL
-        // EmbeddedWal::open will read the header, so it must have the correct values
-        mem.header.wal_checkpoint_pos = 0;
-        mem.header.wal_sequence = 0;
-        crate::persist_header(&mut mem.file, &mem.header)?;
-        mem.file.sync_all()?;
-        doctor_log!("doctor: reset_wal - header updated with wal_sequence=0, wal_checkpoint_pos=0");
-
-        // Now reopen the WAL with the clean state
-        mem.wal = EmbeddedWal::open(&mem.file, &mem.header)?;
-        doctor_log!("doctor: reset_wal - WAL reopened successfully");
-
-        // CRITICAL: Clear dirty flag to prevent Drop from calling commit()
-        // Drop handler will call commit() if dirty=true, which would corrupt the WAL we just cleaned
-        mem.dirty = false;
-        #[cfg(feature = "lex")]
-        {
-            mem.tantivy_dirty = false;
-        }
-        doctor_log!("doctor: reset_wal - cleared dirty flags");
-        Ok(())
     }
 
     fn run_verification(path: &Path) -> Result<VerificationReport> {

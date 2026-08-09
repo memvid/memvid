@@ -3,7 +3,8 @@
 
 use memvid_core::{
     EmbeddingIdentitySummary, MEMVID_EMBEDDING_MODEL_KEY, MEMVID_EMBEDDING_PROVIDER_KEY, Memvid,
-    MemvidError, PutOptions, TimelineQuery, constants::HEADER_SIZE, io::header::HeaderCodec,
+    MemvidError, PutOptions, TimelineQuery, VerificationStatus, constants::HEADER_SIZE,
+    io::header::HeaderCodec,
 };
 use std::fs::File;
 use std::io::Read;
@@ -536,5 +537,198 @@ fn commit_per_put_survives_wal_growth() {
         reopened.stats().unwrap().frame_count,
         frames_written,
         "all frames should be durable after WAL growth"
+    );
+}
+
+/// Vacuum must reclaim disk space left behind by deleted (superseded) frames.
+///
+/// Regression test for a `footer_offset` clamp in `rebuild_indexes`: `vacuum()`
+/// rebuilt the indexes at a smaller size but never truncated the file, so it
+/// reclaimed nothing.
+#[test]
+fn vacuum_reclaims_space_from_deleted_frames() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.mv2");
+
+    // Insert enough sizeable documents (each kept under the chunking threshold)
+    // that deleted payload + index space dominates fixed overhead (header, WAL,
+    // TOC).
+    let mut body_lens: Vec<usize> = Vec::new();
+    {
+        let mut mem = Memvid::create(&path).unwrap();
+        for i in 0..200 {
+            let body =
+                format!("document {i}: the quick brown fox jumps over the lazy dog. ").repeat(25);
+            let opts = PutOptions {
+                uri: Some(format!("mv2://doc/{i}")),
+                title: Some(format!("Document {i}")),
+                ..Default::default()
+            };
+            mem.put_bytes_with_options(body.as_bytes(), opts).unwrap();
+            body_lens.push(body.len());
+        }
+        mem.commit().unwrap();
+    }
+
+    // Delete every other document, measure the file, then compact.
+    let size_before;
+    let mut deleted_bytes = 0usize;
+    {
+        let mut mem = Memvid::open(&path).unwrap();
+        for i in (0..200).step_by(2) {
+            let frame_id = mem.frame_by_uri(&format!("mv2://doc/{i}")).unwrap().id;
+            mem.delete_frame(frame_id).unwrap();
+            deleted_bytes += body_lens[i];
+        }
+        mem.commit().unwrap();
+        size_before = std::fs::metadata(&path).unwrap().len();
+
+        mem.vacuum().unwrap();
+    }
+
+    let size_after = std::fs::metadata(&path).unwrap().len();
+    let reclaimed = size_before.saturating_sub(size_after);
+    let expected_min = u64::try_from(deleted_bytes / 2).unwrap();
+
+    // Post-fix, vacuum reclaims at least the deleted payload bytes (plus their
+    // index entries). Pre-fix it reclaims ~nothing, so this assertion fails.
+    assert!(
+        reclaimed >= expected_min,
+        "vacuum reclaimed {reclaimed} bytes; expected >= {expected_min} \
+         (deleted {deleted_bytes} payload bytes; before={size_before}, after={size_after})"
+    );
+
+    // Reclaiming must not corrupt any section. Deep verify covers the time/lex/vec
+    // indexes and the WAL, but NOT the sketch track — that is asserted explicitly
+    // below.
+    let report = Memvid::verify(&path, true).unwrap();
+    assert_eq!(
+        report.overall_status,
+        VerificationStatus::Passed,
+        "vacuumed file should verify as healthy; checks: {:?}",
+        report.checks
+    );
+
+    // The sketch track is the one section rebuild_indexes omits; confirm it
+    // survived the compaction rather than being truncated under a stale manifest.
+    let mem = Memvid::open_read_only(&path).unwrap();
+    assert!(mem.has_sketches(), "sketch track must survive vacuum");
+    assert!(
+        mem.sketch_stats().entry_count > 0,
+        "sketch track should be non-empty after vacuum"
+    );
+}
+
+/// Vacuum must preserve every active frame and leave the file consistent.
+#[test]
+fn vacuum_preserves_active_frames() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.mv2");
+
+    {
+        let mut mem = Memvid::create(&path).unwrap();
+        for i in 0..50 {
+            let opts = PutOptions {
+                uri: Some(format!("mv2://doc/{i}")),
+                title: Some(format!("Document {i}")),
+                ..Default::default()
+            };
+            mem.put_bytes_with_options(format!("content for document {i}").as_bytes(), opts)
+                .unwrap();
+        }
+        mem.commit().unwrap();
+    }
+
+    // Delete the even-indexed documents (resolving FrameId by URI), then compact.
+    {
+        let mut mem = Memvid::open(&path).unwrap();
+        for i in (0..50).step_by(2) {
+            let frame_id = mem.frame_by_uri(&format!("mv2://doc/{i}")).unwrap().id;
+            mem.delete_frame(frame_id).unwrap();
+        }
+        mem.commit().unwrap();
+        mem.vacuum().unwrap();
+    }
+
+    // The compacted file verifies as healthy — a deep check includes a clean WAL,
+    // which vacuum must leave behind.
+    let report = Memvid::verify(&path, true).unwrap();
+    assert_eq!(
+        report.overall_status,
+        VerificationStatus::Passed,
+        "vacuumed file should verify as healthy; checks: {:?}",
+        report.checks
+    );
+
+    // Every surviving (odd-indexed) frame still resolves with its metadata.
+    let mem = Memvid::open_read_only(&path).unwrap();
+    for i in (1..50).step_by(2) {
+        let frame = mem.frame_by_uri(&format!("mv2://doc/{i}")).unwrap();
+        assert_eq!(frame.title, Some(format!("Document {i}")));
+    }
+}
+
+/// Vacuum must preserve the vector index — a path the lex-only tests never
+/// exercise. Asserts the vec index both verifies AND answers a real vector query
+/// after compaction (decode alone is insufficient).
+#[cfg(feature = "vec")]
+#[test]
+fn vacuum_preserves_vector_index() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.mv2");
+
+    const N: usize = 32;
+    let embedding = |i: usize| {
+        let mut v = vec![0.0f32; N];
+        v[i] = 1.0;
+        v
+    };
+
+    {
+        let mut mem = Memvid::create(&path).unwrap();
+        for i in 0..N {
+            let opts = PutOptions {
+                uri: Some(format!("mv2://doc/{i}")),
+                title: Some(format!("Document {i}")),
+                ..Default::default()
+            };
+            mem.put_with_embedding_and_options(
+                format!("content for document {i}").as_bytes(),
+                embedding(i),
+                opts,
+            )
+            .unwrap();
+        }
+        mem.commit().unwrap();
+    }
+
+    // Delete even-indexed docs, then compact.
+    {
+        let mut mem = Memvid::open(&path).unwrap();
+        for i in (0..N).step_by(2) {
+            let id = mem.frame_by_uri(&format!("mv2://doc/{i}")).unwrap().id;
+            mem.delete_frame(id).unwrap();
+        }
+        mem.commit().unwrap();
+        mem.vacuum().unwrap();
+    }
+
+    let report = Memvid::verify(&path, true).unwrap();
+    assert_eq!(
+        report.overall_status,
+        VerificationStatus::Passed,
+        "vacuumed file should verify as healthy; checks: {:?}",
+        report.checks
+    );
+
+    // A vector query for a survivor's own embedding must return that survivor —
+    // proves the rebuilt vec index maps to the relocated frames, not just decodes.
+    let mut mem = Memvid::open(&path).unwrap();
+    let survivor_id = mem.frame_by_uri("mv2://doc/3").unwrap().id;
+    let hits = mem.search_vec(&embedding(3), 1).unwrap();
+    assert_eq!(
+        hits.first().map(|h| h.frame_id),
+        Some(survivor_id),
+        "vector search should return the surviving frame after vacuum; hits={hits:?}"
     );
 }

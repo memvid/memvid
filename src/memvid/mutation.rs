@@ -959,29 +959,8 @@ impl Memvid {
             self.flush_tantivy()?;
         }
 
-        // Persist CLIP index if it has embeddings and wasn't already persisted by rebuild_indexes
-        if !indexes_rebuilt && self.clip_enabled {
-            if let Some(ref clip_index) = self.clip_index {
-                if !clip_index.is_empty() {
-                    self.persist_clip_index()?;
-                }
-            }
-        }
-
-        // Persist memories track if it has cards and wasn't already persisted by rebuild_indexes
-        if !indexes_rebuilt && self.memories_track.card_count() > 0 {
-            self.persist_memories_track()?;
-        }
-
-        // Persist logic mesh if it has nodes and wasn't already persisted by rebuild_indexes
-        if !indexes_rebuilt && !self.logic_mesh.is_empty() {
-            self.persist_logic_mesh()?;
-        }
-
-        // Persist sketch track if it has entries
-        if !self.sketch_track.is_empty() {
-            self.persist_sketch_track()?;
-        }
+        // Persist the sections that rebuild_indexes does not itself emit.
+        self.persist_deferred_sections(indexes_rebuilt)?;
 
         // flush_tantivy() and rebuild_indexes() have already set footer_offset correctly.
         // DO NOT overwrite it with catalog_data_end() as that would include orphaned segments.
@@ -2582,6 +2561,39 @@ impl Memvid {
         Ok(())
     }
 
+    /// Persist the sections that a rebuild does not itself emit, so a rebuilt or
+    /// compacted file carries every section at its current offset.
+    ///
+    /// `rebuild_indexes` writes the time/lex/vec indexes and — when it runs — the
+    /// clip, memories, and logic-mesh sections, but it never emits the sketch
+    /// track. Callers pass `indexes_rebuilt = true` when `rebuild_indexes` has just
+    /// run (so only the sketch track is outstanding) and `false` otherwise (so the
+    /// clip/memories/mesh sections are persisted here too). Every caller must
+    /// follow this with `rewrite_toc_footer` and a header persist.
+    fn persist_deferred_sections(&mut self, indexes_rebuilt: bool) -> Result<()> {
+        // clip/memories/mesh are emitted by rebuild_indexes; only re-persist them
+        // here when it did not run.
+        if !indexes_rebuilt && self.clip_enabled {
+            if let Some(ref clip_index) = self.clip_index {
+                if !clip_index.is_empty() {
+                    self.persist_clip_index()?;
+                }
+            }
+        }
+        if !indexes_rebuilt && self.memories_track.card_count() > 0 {
+            self.persist_memories_track()?;
+        }
+        if !indexes_rebuilt && !self.logic_mesh.is_empty() {
+            self.persist_logic_mesh()?;
+        }
+        // The sketch track is never emitted by rebuild_indexes, so it is always
+        // persisted here when present.
+        if !self.sketch_track.is_empty() {
+            self.persist_sketch_track()?;
+        }
+        Ok(())
+    }
+
     #[cfg(feature = "lex")]
     fn apply_lex_wal(&mut self, batch: LexWalBatch) -> Result<()> {
         let LexWalBatch {
@@ -3010,6 +3022,21 @@ impl Memvid {
 }
 
 impl Memvid {
+    /// Compact the file in place, reclaiming space held by deleted or superseded
+    /// frames.
+    ///
+    /// Active-frame payloads are repacked contiguously and all index sections are
+    /// rebuilt from scratch, dropping data that belonged to inactive frames; the
+    /// file is then truncated to its new size and left with a clean WAL.
+    ///
+    /// Space is only reclaimed when the file has no replay segment — a rebuild
+    /// cannot relocate replay bytes, so in that case the payloads are still
+    /// repacked but the file is not shrunk, keeping the replay manifest valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading a payload, rebuilding an index, or writing to
+    /// the file fails.
     pub fn vacuum(&mut self) -> Result<()> {
         self.commit()?;
 
@@ -3052,11 +3079,6 @@ impl Memvid {
         self.toc.segment_catalog.lex_segments.clear();
         self.toc.segment_catalog.vec_segments.clear();
         self.toc.segment_catalog.time_segments.clear();
-        #[cfg(feature = "temporal_track")]
-        {
-            self.toc.temporal_track = None;
-            self.toc.segment_catalog.temporal_segments.clear();
-        }
         #[cfg(feature = "lex")]
         {
             self.toc.segment_catalog.tantivy_segments.clear();
@@ -3073,8 +3095,103 @@ impl Memvid {
             self.tantivy_dirty = false;
         }
 
+        // Reclaim the space freed by compaction. `rebuild_indexes` clamps
+        // `footer_offset` monotonically (to protect replay segments written above
+        // the index region), so without resetting it here the rebuilt — smaller —
+        // indexes get written but the file is never truncated, reclaiming nothing.
+        // Resetting is only safe when nothing above the payload boundary survives
+        // the rebuild by reference. `rebuild_indexes` re-emits every index/track it
+        // owns and `persist_deferred_sections` re-emits the sketch track, but the
+        // replay segment and the temporal track are neither re-emitted nor
+        // relocatable here. So when either is present, keep the clamp and forgo
+        // reclaim rather than truncate the file below a section whose manifest
+        // still points into the old (now-reclaimed) region.
+        //
+        // In that branch the payloads are still repacked low, but
+        // `footer_offset`/`cached_payload_end` are intentionally left at the
+        // pre-compaction positions so the rebuilt indexes are written where they
+        // already were — provably below the pinned sections — at the cost of a
+        // benign unused gap. Skipping the repack entirely for these files would
+        // avoid that gap and is a possible follow-up.
+        if self.toc.replay_manifest.is_none() && self.toc.temporal_track.is_none() {
+            self.cached_payload_end = self.data_end;
+            self.header.footer_offset = self.data_end;
+        }
+
+        // In a `temporal_track` build, `rebuild_indexes` clears the temporal
+        // manifest and — with the empty delta below — re-emits nothing, so
+        // vacuum must carry the section through by hand, exactly as a
+        // default build does. The section's bytes are pinned below the
+        // footer by the reclaim guard above, and vacuum never renumbers
+        // frames, so the saved manifest and segment descriptors stay valid.
+        #[cfg(feature = "temporal_track")]
+        let preserved_temporal = (
+            self.toc.temporal_track.clone(),
+            self.toc.segment_catalog.temporal_segments.clone(),
+        );
+
         self.rebuild_indexes(&[], &[])?;
+
+        #[cfg(feature = "temporal_track")]
+        {
+            self.toc.temporal_track = preserved_temporal.0;
+            self.toc.segment_catalog.temporal_segments = preserved_temporal.1;
+        }
+
+        // `rebuild_indexes` re-emits every section except the sketch track, so
+        // persist the deferred sections and re-finalize the TOC. Without this the
+        // footer reset above would truncate the sketch track out from under its
+        // still-live manifest.
+        self.persist_deferred_sections(true)?;
+        self.rewrite_toc_footer()?;
+        self.header.toc_checksum = self.toc.toc_checksum;
+        // Persist the header here so the new footer_offset/toc_checksum reach disk
+        // as an explicit step, not as a side effect of reset_wal's own header write.
+        crate::persist_header(&mut self.file, &self.header)?;
+
+        // A full rebuild materialises all state directly into the TOC and data
+        // region, so any WAL entry left after it is stale. Discard the WAL so the
+        // file reopens with a clean, consistent log (matching the doctor path).
+        self.reset_wal()?;
+        Ok(())
+    }
+
+    /// Zero the embedded WAL region and reset its checkpoint state.
+    ///
+    /// After a full rebuild ([`vacuum`](Self::vacuum) or a doctor repair) the TOC
+    /// and data region are the authoritative record of every frame, so any residual
+    /// WAL entry is stale. This discards the WAL rather than replaying
+    /// already-persisted records, leaving the file with a clean log.
+    pub(crate) fn reset_wal(&mut self) -> Result<()> {
+        let zeros = [0u8; 4096];
+        let mut remaining = self.header.wal_size;
+        let mut offset = self.header.wal_offset;
+        while remaining > 0 {
+            let chunk = remaining.min(4096);
+            let write_len = usize::try_from(chunk).unwrap_or(zeros.len());
+            self.file.seek(SeekFrom::Start(offset))?;
+            self.file.write_all(&zeros[..write_len])?;
+            remaining -= chunk;
+            offset += chunk;
+        }
         self.file.sync_all()?;
+
+        // Update and persist the header BEFORE reopening the WAL: `EmbeddedWal::open`
+        // reads the header, so it must already reflect the cleared state.
+        self.header.wal_checkpoint_pos = 0;
+        self.header.wal_sequence = 0;
+        crate::persist_header(&mut self.file, &self.header)?;
+        self.file.sync_all()?;
+
+        self.wal = EmbeddedWal::open(&self.file, &self.header)?;
+
+        // Clear dirty flags so the Drop handler does not re-commit into the WAL we
+        // just cleared.
+        self.dirty = false;
+        #[cfg(feature = "lex")]
+        {
+            self.tantivy_dirty = false;
+        }
         Ok(())
     }
 
@@ -4175,5 +4292,89 @@ pub(crate) fn merge_unique(target: &mut Vec<String>, additions: Vec<String>) {
         if seen.insert(candidate.clone()) {
             target.push(candidate);
         }
+    }
+}
+
+#[cfg(test)]
+mod temporal_track_vacuum {
+    use super::*;
+    use crate::types::TemporalTrackManifest;
+    use tempfile::TempDir;
+
+    /// Regression: in a default (non-`temporal_track`) build, vacuum must not
+    /// corrupt a `temporal_track` section written by a temporal-enabled build.
+    /// The reclaim guard skips shrinking when a temporal (or replay) section is
+    /// present, so the manifest stays valid (its bytes remain below the footer)
+    /// rather than being truncated into the rewritten TOC region.
+    ///
+    /// White-box: a default build has no public API to create a temporal section,
+    /// so the manifest is injected directly to simulate a cross-build file.
+    #[test]
+    fn vacuum_preserves_temporal_track_manifest() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("t.mv2");
+
+        {
+            let mut mem = Memvid::create(&path).unwrap();
+            for i in 0..100 {
+                let opts = PutOptions {
+                    uri: Some(format!("mv2://doc/{i}")),
+                    title: Some(format!("Document {i}")),
+                    ..Default::default()
+                };
+                mem.put_bytes_with_options(
+                    format!("content for document number {i} with some filler text").as_bytes(),
+                    opts,
+                )
+                .unwrap();
+            }
+            mem.commit().unwrap();
+        }
+
+        let mut mem = Memvid::open(&path).unwrap();
+        for i in (0..100).step_by(2) {
+            let id = mem.frame_by_uri(&format!("mv2://doc/{i}")).unwrap().id;
+            mem.delete_frame(id).unwrap();
+        }
+        mem.commit().unwrap();
+
+        // Simulate a temporal section written by a temporal-enabled build: a
+        // manifest pointing into the current above-payload region. No real bytes
+        // needed — a default build never reads it; vacuum only carries the manifest
+        // through the TOC.
+        let old_footer = mem.header.footer_offset;
+        mem.toc.temporal_track = Some(TemporalTrackManifest {
+            bytes_offset: old_footer.saturating_sub(64),
+            bytes_length: 64,
+            entry_count: 1,
+            anchor_count: 1,
+            checksum: [0u8; 32],
+            flags: 0,
+        });
+
+        mem.vacuum().unwrap();
+        drop(mem);
+
+        let mem = Memvid::open(&path).unwrap();
+        let file_len = std::fs::metadata(&path).unwrap().len();
+        let tm = mem
+            .toc
+            .temporal_track
+            .clone()
+            .expect("temporal_track manifest should survive vacuum");
+
+        // Correct invariant: an above-payload section must live in the data region,
+        // strictly below the footer (= TOC start). If the offset is >= footer, the
+        // manifest now points into the rewritten TOC → a temporal reader would read
+        // TOC bytes as temporal data (corruption).
+        assert!(
+            tm.bytes_offset + tm.bytes_length <= mem.header.footer_offset,
+            "temporal_track points into the TOC region after vacuum: offset={} len={} footer_offset={} file_len={} old_footer={}",
+            tm.bytes_offset,
+            tm.bytes_length,
+            mem.header.footer_offset,
+            file_len,
+            old_footer
+        );
     }
 }

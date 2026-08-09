@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ed25519 signatures for authenticity
 - Optional AES-256-GCM encryption
 
+### Fixed
+- `vacuum()` now reclaims disk space from deleted or superseded frames. It
+  previously rebuilt the indexes at a smaller size but never truncated the file
+  (a monotonic `footer_offset` clamp), so it freed nothing. It now also re-emits
+  the sketch track and resets the WAL after compaction, leaving the file
+  consistent (deep `verify` passes). Space is not reclaimed for files containing
+  a replay segment, whose bytes a rebuild cannot relocate.
+
 ### Security
 - Embedded WAL prevents data corruption
 - Atomic commits ensure consistency
