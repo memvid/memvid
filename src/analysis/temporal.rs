@@ -132,8 +132,8 @@ impl TemporalNormalizer {
     fn resolve_fixed(&self, phrase: &str) -> Option<TemporalResolution> {
         match phrase {
             "today" => Some(self.date_resolution(self.anchor_date())),
-            "yesterday" => Some(self.date_resolution(add_days(self.anchor_date(), -1))),
-            "tomorrow" => Some(self.date_resolution(add_days(self.anchor_date(), 1))),
+            "yesterday" => Some(self.date_resolution(add_days(self.anchor_date(), -1)?)),
+            "tomorrow" => Some(self.date_resolution(add_days(self.anchor_date(), 1)?)),
             "two days ago" => self.relative_days(-2, RELATIVE_CONFIDENCE),
             "in 3 days" => self.relative_days(3, RELATIVE_CONFIDENCE),
             "two weeks from now" => self.relative_weeks_offset(2),
@@ -141,29 +141,27 @@ impl TemporalNormalizer {
             "two fridays ago" => self.weeks_from_weekday(-2, Weekday::Friday),
             "last friday" => self.weeks_from_weekday(-1, Weekday::Friday),
             "next friday" => self.weeks_from_weekday(1, Weekday::Friday),
-            "this friday" => Some(self.this_weekday(Weekday::Friday)),
-            "next week" => Some(self.week_range(1)),
-            "last week" => Some(self.week_range(-1)),
-            "end of this month" => Some(self.end_of_month()),
-            "start of next month" => Some(self.start_of_next_month()),
-            "last month" => Some(self.month_relative(-1)),
-            "3 months ago" => Some(self.date_with_month_offset(-3)),
+            "this friday" => self.this_weekday(Weekday::Friday),
+            "next week" => self.week_range(1),
+            "last week" => self.week_range(-1),
+            "end of this month" => self.end_of_month(),
+            "start of next month" => self.start_of_next_month(),
+            "last month" => self.month_relative(-1),
+            "3 months ago" => self.date_with_month_offset(-3),
             "in 90 minutes" => {
                 Some(self.datetime_resolution(self.context.anchor + Duration::minutes(90)))
             }
-            "at 5pm today" => Some(self.time_today(17, 0)),
+            "at 5pm today" => self.time_today(17, 0),
             "in the last 24 hours" => Some(self.last_hours_range(24)),
-            "this morning" => Some(self.morning_range()),
-            "on the sunday after next" => Some(self.sunday_after_next()),
-            "next daylight saving change" => Some(self.next_dst_change()),
-            "midnight tomorrow" => Some(self.midnight_tomorrow()),
-            "noon next tuesday" => {
-                Some(self.weekday_in_following_week_at_time(Weekday::Tuesday, 12, 0))
-            }
-            "q4 2025" => Some(self.quarter_range(2025, 4)),
-            "end of q3" => Some(self.end_of_quarter(3)),
-            "first business day of next month" => Some(self.first_business_day_next_month()),
-            "the first business day of next month" => Some(self.first_business_day_next_month()),
+            "this morning" => self.morning_range(),
+            "on the sunday after next" => self.sunday_after_next(),
+            "next daylight saving change" => self.next_dst_change(),
+            "midnight tomorrow" => self.midnight_tomorrow(),
+            "noon next tuesday" => self.weekday_in_following_week_at_time(Weekday::Tuesday, 12, 0),
+            "q4 2025" => self.quarter_range(2025, 4),
+            "end of q3" => self.end_of_quarter(3),
+            "first business day of next month" => self.first_business_day_next_month(),
+            "the first business day of next month" => self.first_business_day_next_month(),
             _ => None,
         }
     }
@@ -244,9 +242,9 @@ impl TemporalNormalizer {
             let hour = convert_hour(hour_raw, caps.name("ampm").map(|m| m.as_str()))?;
             let minute = minute_raw as i32;
             if caps.name("prefix").is_some() {
-                return Some(self.next_weekday_at_time(weekday, hour, minute));
+                return self.next_weekday_at_time(weekday, hour, minute);
             }
-            return Some(self.weekday_at_time(weekday, hour, minute));
+            return self.weekday_at_time(weekday, hour, minute);
         }
 
         if let Some(caps) = BARE_WEEKDAY
@@ -254,7 +252,7 @@ impl TemporalNormalizer {
             .captures(phrase)
         {
             let weekday = parse_weekday(caps.name("weekday")?.as_str())?;
-            return Some(self.this_weekday(weekday));
+            return self.this_weekday(weekday);
         }
 
         None
@@ -282,7 +280,7 @@ impl TemporalNormalizer {
                 .unwrap_or(0);
             let hour = convert_hour(hour_raw, caps.name("ampm").map(|m| m.as_str()))?;
             let minute = minute_raw as i32;
-            return Some(self.time_today(hour, minute));
+            return self.time_today(hour, minute);
         }
 
         if let Some(caps) = TODAY_PREFIX
@@ -302,7 +300,7 @@ impl TemporalNormalizer {
             let marker = caps.name("ampm").map(|m| m.as_str());
             let hour = convert_hour(hour_raw, marker)?;
             let minute = minute_raw as i32;
-            return Some(self.time_today(hour, minute));
+            return self.time_today(hour, minute);
         }
 
         None
@@ -319,9 +317,9 @@ impl TemporalNormalizer {
 
         let month: u8 = caps.name("month")?.as_str().parse().ok()?;
         let day: u8 = caps.name("day")?.as_str().parse().ok()?;
-        let year = parse_year(caps.name("year")?.as_str());
+        let year = parse_year(caps.name("year")?.as_str())?;
         let month_enum = Month::try_from(month).ok()?;
-        let last_day = last_day_of_month(year, month_enum);
+        let last_day = last_day_of_month(year, month_enum)?;
         if day == 0 || day > last_day {
             return None;
         }
@@ -343,7 +341,7 @@ impl TemporalNormalizer {
         {
             let quarter: i32 = caps.name("quarter")?.as_str().parse().ok()?;
             let year: i32 = caps.name("year")?.as_str().parse().ok()?;
-            return Some(self.quarter_range(year, quarter));
+            return self.quarter_range(year, quarter);
         }
         if let Some(caps) = QUARTER_WORD_YEAR
             .get_or_init(|| {
@@ -360,7 +358,7 @@ impl TemporalNormalizer {
                 _ => return None,
             };
             let year = caps.name("year")?.as_str().parse().ok()?;
-            return Some(self.quarter_range(year, quarter));
+            return self.quarter_range(year, quarter);
         }
         if let Some(caps) = QUARTER_ORDINAL_YEAR
             .get_or_init(|| {
@@ -371,7 +369,7 @@ impl TemporalNormalizer {
         {
             let quarter: i32 = caps.name("num")?.as_str().parse().ok()?;
             let year: i32 = caps.name("year")?.as_str().parse().ok()?;
-            return Some(self.quarter_range(year, quarter));
+            return self.quarter_range(year, quarter);
         }
         None
     }
@@ -382,12 +380,12 @@ impl TemporalNormalizer {
         let caps = YEAR_SINGLE
             .get_or_init(|| Regex::new(r"^(?:year )?(?P<year>\d{4})$").unwrap())
             .captures(phrase)?;
-        let year = parse_year(caps.name("year")?.as_str());
+        let year = parse_year(caps.name("year")?.as_str())?;
         Some(self.year_range(year))
     }
 
     fn relative_days(&self, delta: i64, confidence: u16) -> Option<TemporalResolution> {
-        let date = add_days(self.anchor_date(), delta);
+        let date = add_days(self.anchor_date(), delta)?;
         let mut res = self.date_resolution(date);
         res.confidence = confidence;
         res.flags.push(TemporalResolutionFlag::Relative);
@@ -395,7 +393,7 @@ impl TemporalNormalizer {
     }
 
     fn relative_weeks_offset(&self, weeks: i32) -> Option<TemporalResolution> {
-        let date = add_days(self.anchor_date(), (weeks as i64) * 7);
+        let date = add_days(self.anchor_date(), (weeks as i64) * 7)?;
         let mut res = self.date_resolution(date);
         res.confidence = RELATIVE_CONFIDENCE;
         res.flags.push(TemporalResolutionFlag::Relative);
@@ -404,84 +402,84 @@ impl TemporalNormalizer {
 
     fn weeks_from_weekday(&self, weeks: i32, weekday: Weekday) -> Option<TemporalResolution> {
         if weeks == 0 {
-            return Some(self.this_weekday(weekday));
+            return self.this_weekday(weekday);
         }
         if weeks > 0 {
-            let mut date = self.next_weekday_after(self.anchor_date(), weekday);
+            let mut date = self.next_weekday_after(self.anchor_date(), weekday)?;
             for _ in 1..weeks {
-                date = add_days(self.next_weekday_after(date, weekday), 0);
+                date = self.next_weekday_after(date, weekday)?;
             }
             return Some(self.date_resolution(date));
         }
-        let mut date = self.previous_weekday_before(self.anchor_date(), weekday);
+        let mut date = self.previous_weekday_before(self.anchor_date(), weekday)?;
         for _ in 1..weeks.abs() {
-            date = self.previous_weekday_before(date, weekday);
+            date = self.previous_weekday_before(date, weekday)?;
         }
         Some(self.date_resolution(date))
     }
 
-    fn this_weekday(&self, weekday: Weekday) -> TemporalResolution {
-        let start = self.start_of_week(self.anchor_date());
+    fn this_weekday(&self, weekday: Weekday) -> Option<TemporalResolution> {
+        let start = self.start_of_week(self.anchor_date())?;
         let mut offset = weekday.number_days_from_monday() as i64
             - self.context.week_start.number_days_from_monday() as i64;
         if offset < 0 {
             offset += 7;
         }
-        let date = add_days(start, offset);
-        self.date_resolution(date)
+        let date = add_days(start, offset)?;
+        Some(self.date_resolution(date))
     }
 
-    fn week_range(&self, offset_weeks: i32) -> TemporalResolution {
+    fn week_range(&self, offset_weeks: i32) -> Option<TemporalResolution> {
         let start = add_days(
-            self.start_of_week(self.anchor_date()),
+            self.start_of_week(self.anchor_date())?,
             (offset_weeks * 7) as i64,
-        );
-        let end = add_days(start, 6);
+        )?;
+        let end = add_days(start, 6)?;
         let mut res = self.date_range_resolution(start, end);
         res.flags.push(TemporalResolutionFlag::Relative);
         res.confidence = RELATIVE_CONFIDENCE;
-        res
+        Some(res)
     }
 
-    fn end_of_month(&self) -> TemporalResolution {
+    fn end_of_month(&self) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let last_day = last_day_of_month(date.year(), date.month());
-        let end = Date::from_calendar_date(date.year(), date.month(), last_day).unwrap();
-        self.date_resolution(end)
+        let last_day = last_day_of_month(date.year(), date.month())?;
+        let end = Date::from_calendar_date(date.year(), date.month(), last_day).ok()?;
+        Some(self.date_resolution(end))
     }
 
-    fn start_of_next_month(&self) -> TemporalResolution {
+    fn start_of_next_month(&self) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let (year, month) = add_months(date.year(), date.month(), 1);
-        let start = Date::from_calendar_date(year, month, 1).unwrap();
-        self.date_resolution(start)
+        let (year, month) = add_months(date.year(), date.month(), 1)?;
+        let start = Date::from_calendar_date(year, month, 1).ok()?;
+        Some(self.date_resolution(start))
     }
 
-    fn month_relative(&self, offset: i32) -> TemporalResolution {
+    fn month_relative(&self, offset: i32) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let (year, month) = add_months(date.year(), date.month(), offset);
-        TemporalResolution {
+        let (year, month) = add_months(date.year(), date.month(), offset)?;
+        Some(TemporalResolution {
             value: TemporalResolutionValue::Month { year, month },
             flags: vec![TemporalResolutionFlag::Relative],
             confidence: RELATIVE_CONFIDENCE,
-        }
+        })
     }
 
-    fn date_with_month_offset(&self, offset: i32) -> TemporalResolution {
+    fn date_with_month_offset(&self, offset: i32) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let (year, month) = add_months(date.year(), date.month(), offset);
-        let day = date.day().min(last_day_of_month(year, month));
-        let new_date = Date::from_calendar_date(year, month, day).unwrap();
+        let (year, month) = add_months(date.year(), date.month(), offset)?;
+        let day = date.day().min(last_day_of_month(year, month)?);
+        let new_date = Date::from_calendar_date(year, month, day).ok()?;
         let mut res = self.date_resolution(new_date);
         res.flags.push(TemporalResolutionFlag::Relative);
         res.confidence = RELATIVE_CONFIDENCE;
-        res
+        Some(res)
     }
 
-    fn time_today(&self, hour: i32, minute: i32) -> TemporalResolution {
+    fn time_today(&self, hour: i32, minute: i32) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let dt = combine(date, hour, minute, 0, self.context.anchor.offset());
-        self.datetime_resolution(dt)
+        let dt = combine(date, hour, minute, 0, self.context.anchor.offset())?;
+        Some(self.datetime_resolution(dt))
     }
 
     fn last_hours_range(&self, hours: i64) -> TemporalResolution {
@@ -493,55 +491,71 @@ impl TemporalNormalizer {
         res
     }
 
-    fn morning_range(&self) -> TemporalResolution {
+    fn morning_range(&self) -> Option<TemporalResolution> {
         let date = self.anchor_date();
-        let start = combine(date, 6, 0, 0, self.context.anchor.offset());
-        let end = combine(date, 11, 59, 59, self.context.anchor.offset());
+        let start = combine(date, 6, 0, 0, self.context.anchor.offset())?;
+        let end = combine(date, 11, 59, 59, self.context.anchor.offset())?;
         let mut res = self.datetime_range_resolution(start, end);
         res.flags.push(TemporalResolutionFlag::Relative);
-        res
+        Some(res)
     }
 
-    fn sunday_after_next(&self) -> TemporalResolution {
-        let next = self.next_weekday_after(self.anchor_date(), Weekday::Sunday);
-        let after_next = add_days(next, 7);
+    fn sunday_after_next(&self) -> Option<TemporalResolution> {
+        let next = self.next_weekday_after(self.anchor_date(), Weekday::Sunday)?;
+        let after_next = add_days(next, 7)?;
         let mut res = self.date_resolution(after_next);
         res.flags.push(TemporalResolutionFlag::Relative);
-        res
+        Some(res)
     }
 
-    fn next_dst_change(&self) -> TemporalResolution {
+    fn next_dst_change(&self) -> Option<TemporalResolution> {
         let year = self.anchor_date().year();
-        let november_first = Date::from_calendar_date(year, Month::November, 1).unwrap();
-        let first_sunday = self.next_weekday_on_or_after(november_first, Weekday::Sunday);
-        let date = add_days(first_sunday, 0);
-        let dt = combine(date, 1, 0, 0, self.context.anchor.offset());
+        let november_first = Date::from_calendar_date(year, Month::November, 1).ok()?;
+        let first_sunday = self.next_weekday_on_or_after(november_first, Weekday::Sunday)?;
+        let date = add_days(first_sunday, 0)?;
+        let dt = combine(date, 1, 0, 0, self.context.anchor.offset())?;
         let mut res = self.datetime_resolution(dt);
         res.flags.push(TemporalResolutionFlag::Relative);
-        res
+        Some(res)
     }
 
-    fn midnight_tomorrow(&self) -> TemporalResolution {
-        let date = add_days(self.anchor_date(), 1);
-        let dt = combine(date, 0, 0, 0, self.context.anchor.offset());
-        self.datetime_resolution(dt)
+    fn midnight_tomorrow(&self) -> Option<TemporalResolution> {
+        let date = add_days(self.anchor_date(), 1)?;
+        let dt = combine(date, 0, 0, 0, self.context.anchor.offset())?;
+        Some(self.datetime_resolution(dt))
     }
 
-    fn next_weekday_at_time(&self, weekday: Weekday, hour: i32, minute: i32) -> TemporalResolution {
-        let date = self.next_weekday_after(self.anchor_date(), weekday);
-        self.datetime_resolution(combine(date, hour, minute, 0, self.context.anchor.offset()))
+    fn next_weekday_at_time(
+        &self,
+        weekday: Weekday,
+        hour: i32,
+        minute: i32,
+    ) -> Option<TemporalResolution> {
+        let date = self.next_weekday_after(self.anchor_date(), weekday)?;
+        Some(self.datetime_resolution(combine(
+            date,
+            hour,
+            minute,
+            0,
+            self.context.anchor.offset(),
+        )?))
     }
 
-    fn weekday_at_time(&self, weekday: Weekday, hour: i32, minute: i32) -> TemporalResolution {
+    fn weekday_at_time(
+        &self,
+        weekday: Weekday,
+        hour: i32,
+        minute: i32,
+    ) -> Option<TemporalResolution> {
         let today = self.anchor_date();
-        let target = self.next_weekday_on_or_after(today, weekday);
-        self.datetime_resolution(combine(
+        let target = self.next_weekday_on_or_after(today, weekday)?;
+        Some(self.datetime_resolution(combine(
             target,
             hour,
             minute,
             0,
             self.context.anchor.offset(),
-        ))
+        )?))
     }
 
     fn weekday_in_following_week_at_time(
@@ -549,13 +563,19 @@ impl TemporalNormalizer {
         weekday: Weekday,
         hour: i32,
         minute: i32,
-    ) -> TemporalResolution {
-        let first = self.next_weekday_after(self.anchor_date(), weekday);
-        let date = add_days(first, 7);
-        self.datetime_resolution(combine(date, hour, minute, 0, self.context.anchor.offset()))
+    ) -> Option<TemporalResolution> {
+        let first = self.next_weekday_after(self.anchor_date(), weekday)?;
+        let date = add_days(first, 7)?;
+        Some(self.datetime_resolution(combine(
+            date,
+            hour,
+            minute,
+            0,
+            self.context.anchor.offset(),
+        )?))
     }
 
-    fn quarter_range(&self, year: i32, quarter: i32) -> TemporalResolution {
+    fn quarter_range(&self, year: i32, quarter: i32) -> Option<TemporalResolution> {
         let start_month = match quarter {
             1 => Month::January,
             2 => Month::April,
@@ -563,11 +583,11 @@ impl TemporalNormalizer {
             4 => Month::October,
             _ => Month::January,
         };
-        let start = Date::from_calendar_date(year, start_month, 1).unwrap();
-        let (end_year, end_month) = add_months(year, start_month, 2);
-        let end_day = last_day_of_month(end_year, end_month);
-        let end = Date::from_calendar_date(end_year, end_month, end_day).unwrap();
-        self.date_range_resolution(start, end)
+        let start = Date::from_calendar_date(year, start_month, 1).ok()?;
+        let (end_year, end_month) = add_months(year, start_month, 2)?;
+        let end_day = last_day_of_month(end_year, end_month)?;
+        let end = Date::from_calendar_date(end_year, end_month, end_day).ok()?;
+        Some(self.date_range_resolution(start, end))
     }
 
     fn year_range(&self, year: i32) -> TemporalResolution {
@@ -576,28 +596,28 @@ impl TemporalNormalizer {
         self.date_range_resolution(start, end)
     }
 
-    fn end_of_quarter(&self, quarter: i32) -> TemporalResolution {
+    fn end_of_quarter(&self, quarter: i32) -> Option<TemporalResolution> {
         let year = self.anchor_date().year();
-        let mut res = self.quarter_range(year, quarter);
+        let mut res = self.quarter_range(year, quarter)?;
         if let TemporalResolutionValue::DateRange { start: _, end } = &mut res.value {
             res.value = TemporalResolutionValue::Date(*end);
         }
         res.flags.push(TemporalResolutionFlag::Relative);
-        res
+        Some(res)
     }
 
-    fn first_business_day_next_month(&self) -> TemporalResolution {
-        let start = match self.start_of_next_month().value {
+    fn first_business_day_next_month(&self) -> Option<TemporalResolution> {
+        let start = match self.start_of_next_month()?.value {
             TemporalResolutionValue::Date(date) => date,
-            _ => unreachable!(),
+            _ => return None,
         };
         let mut date = start;
         while matches!(date.weekday(), Weekday::Saturday | Weekday::Sunday) {
-            date = add_days(date, 1);
+            date = add_days(date, 1)?;
         }
         let mut res = self.date_resolution(date);
         res.flags.push(TemporalResolutionFlag::Relative);
-        res
+        Some(res)
     }
 
     fn date_resolution(&self, date: Date) -> TemporalResolution {
@@ -640,44 +660,44 @@ impl TemporalNormalizer {
         self.context.anchor.date()
     }
 
-    fn start_of_week(&self, date: Date) -> Date {
+    fn start_of_week(&self, date: Date) -> Option<Date> {
         let mut current = date;
         while current.weekday() != self.context.week_start {
-            current = add_days(current, -1);
+            current = add_days(current, -1)?;
         }
-        current
+        Some(current)
     }
 
-    fn next_weekday_after(&self, date: Date, weekday: Weekday) -> Date {
-        let mut current = add_days(date, 1);
+    fn next_weekday_after(&self, date: Date, weekday: Weekday) -> Option<Date> {
+        let mut current = add_days(date, 1)?;
         while current.weekday() != weekday {
-            current = add_days(current, 1);
+            current = add_days(current, 1)?;
         }
-        current
+        Some(current)
     }
 
-    fn previous_weekday_before(&self, date: Date, weekday: Weekday) -> Date {
-        let mut current = add_days(date, -1);
+    fn previous_weekday_before(&self, date: Date, weekday: Weekday) -> Option<Date> {
+        let mut current = add_days(date, -1)?;
         while current.weekday() != weekday {
-            current = add_days(current, -1);
+            current = add_days(current, -1)?;
         }
-        current
+        Some(current)
     }
 
-    fn next_weekday_on_or_after(&self, date: Date, weekday: Weekday) -> Date {
+    fn next_weekday_on_or_after(&self, date: Date, weekday: Weekday) -> Option<Date> {
         let mut current = date;
         while current.weekday() != weekday {
-            current = add_days(current, 1);
+            current = add_days(current, 1)?;
         }
-        current
+        Some(current)
     }
 }
 
-fn add_days(date: Date, delta: i64) -> Date {
-    date.checked_add(Duration::days(delta)).unwrap()
+fn add_days(date: Date, delta: i64) -> Option<Date> {
+    date.checked_add(Duration::days(delta))
 }
 
-fn add_months(year: i32, month: Month, delta: i32) -> (i32, Month) {
+fn add_months(year: i32, month: Month, delta: i32) -> Option<(i32, Month)> {
     let mut total = month as i32 + delta;
     let mut new_year = year;
     while total > 12 {
@@ -688,17 +708,17 @@ fn add_months(year: i32, month: Month, delta: i32) -> (i32, Month) {
         total += 12;
         new_year -= 1;
     }
-    let month_enum = Month::try_from(total as u8).unwrap();
-    (new_year, month_enum)
+    let month_enum = Month::try_from(total as u8).ok()?;
+    Some((new_year, month_enum))
 }
 
-fn last_day_of_month(year: i32, month: Month) -> u8 {
+fn last_day_of_month(year: i32, month: Month) -> Option<u8> {
     let next_month = if month == Month::December {
-        Date::from_calendar_date(year + 1, Month::January, 1).unwrap()
+        Date::from_calendar_date(year + 1, Month::January, 1).ok()?
     } else {
-        Date::from_calendar_date(year, month.next(), 1).unwrap()
+        Date::from_calendar_date(year, month.next(), 1).ok()?
     };
-    add_days(next_month, -1).day()
+    Some(add_days(next_month, -1)?.day())
 }
 
 fn combine(
@@ -707,12 +727,12 @@ fn combine(
     minute: i32,
     second: i32,
     offset: time::UtcOffset,
-) -> OffsetDateTime {
+) -> Option<OffsetDateTime> {
     let primitive = PrimitiveDateTime::new(
         date,
-        Time::from_hms(hour as u8, minute as u8, second as u8).unwrap(),
+        Time::from_hms(hour as u8, minute as u8, second as u8).ok()?,
     );
-    primitive.assume_offset(offset)
+    Some(primitive.assume_offset(offset))
 }
 
 fn parse_number(token: &str) -> Option<i64> {
@@ -782,12 +802,12 @@ fn sanitize_ampm(input: &str) -> String {
         .replace("p.m", "pm")
 }
 
-fn parse_year(token: &str) -> i32 {
+fn parse_year(token: &str) -> Option<i32> {
     if token.len() == 2 {
-        let value: i32 = token.parse().unwrap();
-        2000 + value
+        let value: i32 = token.parse().ok()?;
+        Some(2000 + value)
     } else {
-        token.parse().unwrap()
+        token.parse().ok()
     }
 }
 
