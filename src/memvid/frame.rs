@@ -378,12 +378,12 @@ impl Memvid {
                 reason: "frame id out of range".into(),
             })?;
         let preview = self.frame_preview(&frame)?;
-        let content = self.frame_content(&frame)?;
+        let content = self.frame_content(&frame)?.to_lowercase();
         let count = query
             .split_whitespace()
             .filter(|token| !token.is_empty())
             .map(str::to_lowercase)
-            .map(|needle| content.to_lowercase().matches(&needle).count())
+            .map(|needle| content.matches(&needle).count())
             .sum();
         Ok((preview, count))
     }
