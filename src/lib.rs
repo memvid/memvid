@@ -337,8 +337,44 @@ use bincode::config::{self, Config};
 use io::header::HeaderCodec;
 
 const TIMELINE_PREVIEW_BYTES: usize = 120;
-const MAX_INDEX_BYTES: u64 = 512 * 1024 * 1024; // Increased from 64MB to 512MB for large datasets
-const MAX_TIME_INDEX_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Maximum decoded size of the lex/vec/segment index, selected at compile time.
+///
+/// The baseline is 512 MiB. Enabling one of the `max_index_bytes_1gib`,
+/// `max_index_bytes_2gib`, or `max_index_bytes_4gib` Cargo features raises the
+/// cap. Cargo features are additive, so if more than one tier is enabled
+/// (e.g. via feature unification across the dependency graph) the largest wins.
+const MAX_INDEX_BYTES: u64 = {
+    const MIB: u64 = 1024 * 1024;
+    const GIB: u64 = 1024 * MIB;
+    if cfg!(feature = "max_index_bytes_4gib") {
+        4 * GIB
+    } else if cfg!(feature = "max_index_bytes_2gib") {
+        2 * GIB
+    } else if cfg!(feature = "max_index_bytes_1gib") {
+        GIB
+    } else {
+        512 * MIB
+    }
+};
+
+/// Maximum decoded size of the time index, selected at compile time.
+///
+/// Mirrors [`MAX_INDEX_BYTES`]: baseline 512 MiB, raised by the
+/// `max_time_index_bytes_1gib` / `_2gib` / `_4gib` features (largest wins).
+const MAX_TIME_INDEX_BYTES: u64 = {
+    const MIB: u64 = 1024 * 1024;
+    const GIB: u64 = 1024 * MIB;
+    if cfg!(feature = "max_time_index_bytes_4gib") {
+        4 * GIB
+    } else if cfg!(feature = "max_time_index_bytes_2gib") {
+        2 * GIB
+    } else if cfg!(feature = "max_time_index_bytes_1gib") {
+        GIB
+    } else {
+        512 * MIB
+    }
+};
 const MAX_FRAME_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_SEARCH_TEXT_LIMIT: usize = 32_768;
 

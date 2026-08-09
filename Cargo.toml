@@ -133,6 +133,17 @@ api_embed = ["dep:reqwest"]
 simd = ["dep:wide"]
 hnsw_bench = ["dep:hnsw", "dep:rand", "dep:space", "dep:rand_pcg"]
 
+# Compile-time index size caps. Baseline (no feature) is 512 MiB; enabling a
+# tier raises the cap. Cargo features are additive, so the largest enabled tier
+# wins — enabling several is safe, not a conflict.
+max_index_bytes_1gib = []
+max_index_bytes_2gib = []
+max_index_bytes_4gib = []
+# Same tiering for the chronological time index.
+max_time_index_bytes_1gib = []
+max_time_index_bytes_2gib = []
+max_time_index_bytes_4gib = []
+
 [dev-dependencies]
 fastrand = "2.0"
 tempfile = "3.10.1"
