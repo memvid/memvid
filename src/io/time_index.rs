@@ -7,6 +7,18 @@ use crate::{
     error::{MemvidError, Result},
 };
 
+/// Safety ceiling on declared time-index track length. A malformed or hostile
+/// `.mv2` can declare an arbitrarily large `bytes_length` in its TOC; without
+/// this cap, `read_track` would allocate proportional capacity before the
+/// later `read_exact` would fail. 16 GiB matches the temporal-index ceiling.
+const MAX_TIME_INDEX_BYTES: u64 = 1 << 34;
+
+/// Initial `Vec` capacity for the decoded entries. Bounds the *eager*
+/// allocation driven by the on-disk `count` field — the vector still grows
+/// to fit all entries that the reader successfully delivers, but a hostile
+/// `count` no longer reserves count-proportional memory up front.
+const INITIAL_ENTRIES_CAPACITY: usize = 1024;
+
 /// Raw entry used to build the time index track.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeIndexEntry {
@@ -63,6 +75,12 @@ pub fn read_track<R: Read + Seek>(
     offset: u64,
     length: u64,
 ) -> Result<Vec<TimeIndexEntry>> {
+    if length > MAX_TIME_INDEX_BYTES {
+        return Err(MemvidError::InvalidTimeIndex {
+            reason: "length exceeds supported limit".into(),
+        });
+    }
+
     reader.seek(SeekFrom::Start(offset))?;
 
     let mut magic = [0u8; 4];
@@ -95,9 +113,13 @@ pub fn read_track<R: Read + Seek>(
         });
     }
 
-    // Safe: count validated by checked_mul and payload_bytes comparison above
+    // Clamp the eager allocation: a hostile `count` aligned just under
+    // MAX_TIME_INDEX_BYTES would otherwise reserve ~16 GiB before any byte of
+    // payload is read. The vector still grows as `read_exact` succeeds, so the
+    // committed memory tracks what the file actually delivers.
     #[allow(clippy::cast_possible_truncation)]
-    let mut entries = Vec::with_capacity(count as usize);
+    let initial_capacity = (count as usize).min(INITIAL_ENTRIES_CAPACITY);
+    let mut entries = Vec::with_capacity(initial_capacity);
     let mut prev: Option<TimeIndexEntry> = None;
     for _ in 0..count {
         let mut ts_buf = [0u8; 8];
@@ -189,6 +211,58 @@ mod tests {
         file.seek(SeekFrom::Start(0)).unwrap();
         let err = read_track(&mut file, 0, length).expect_err("unsorted entries must fail");
         matches!(err, MemvidError::InvalidTimeIndex { .. });
+    }
+
+    #[test]
+    fn read_rejects_oversized_declared_length() {
+        // Hostile or malformed TOC declaring a length above the safety ceiling
+        // must be rejected before any capacity allocation happens.
+        let mut file = tempfile().expect("temp file");
+        let err = read_track(&mut file, 0, MAX_TIME_INDEX_BYTES + 1)
+            .expect_err("oversized length must be rejected");
+        match err {
+            MemvidError::InvalidTimeIndex { reason } => {
+                assert!(reason.contains("length"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected InvalidTimeIndex, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn read_at_cap_does_not_eagerly_allocate_count_proportional_memory() {
+        // Largest aligned, accepted declared length: declared_length ==
+        // MAX_TIME_INDEX_BYTES, count == (MAX_TIME_INDEX_BYTES - header)/16.
+        // This passes the length-ceiling check and the count*16 == payload
+        // check, so it exercises the same code path that previously allocated
+        // count-proportional capacity (~16 GiB) before any payload byte was
+        // read. With the clamped initial capacity, the reader should commit
+        // only `INITIAL_ENTRIES_CAPACITY` slots worth (~16 KiB), then fail at
+        // the first `read_exact` because the file body is empty.
+        const ENTRY_SIZE: u64 = 16;
+        let header_len = 4u64 + 8;
+        let count = (MAX_TIME_INDEX_BYTES - header_len) / ENTRY_SIZE;
+        let declared_length = header_len + count * ENTRY_SIZE;
+        assert!(declared_length <= MAX_TIME_INDEX_BYTES);
+
+        // Provide only the 12-byte header so any count-driven body read fails
+        // fast with UnexpectedEof, rather than tying up real memory.
+        let mut buf = Vec::with_capacity(12);
+        buf.extend_from_slice(&TIME_INDEX_MAGIC);
+        buf.extend_from_slice(&count.to_le_bytes());
+        let mut cursor = std::io::Cursor::new(buf);
+
+        let err = read_track(&mut cursor, 0, declared_length)
+            .expect_err("near-cap aligned length must fail at body read, not succeed");
+        // The function reached the read loop and ran out of bytes — proving it
+        // did not silently complete and that the eager allocation was bounded
+        // (otherwise the test process would have requested ~16 GiB up front).
+        assert!(
+            matches!(
+                &err,
+                MemvidError::Io { source, .. } if source.kind() == std::io::ErrorKind::UnexpectedEof
+            ),
+            "expected UnexpectedEof, got {err:?}",
+        );
     }
 
     #[test]

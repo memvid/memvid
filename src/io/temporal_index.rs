@@ -19,6 +19,12 @@ const MENTION_RECORD_SIZE: usize = 32; // padded to 32 bytes for alignment
 const ANCHOR_RECORD_SIZE: usize = 24;
 const MAX_TEMPORAL_TRACK_BYTES: u64 = 1 << 34; // 16 GiB safety ceiling
 
+/// Initial capacity for decoded mention/anchor vectors. Bounds the *eager*
+/// allocation driven by the on-disk header counts — both vectors still grow
+/// to fit all records the reader delivers, but a hostile count no longer
+/// reserves count-proportional memory before any record is read.
+const INITIAL_RECORDS_CAPACITY: usize = 1024;
+
 #[derive(Debug, Clone, Copy)]
 struct RawMention {
     ts_utc: i64,
@@ -298,37 +304,49 @@ pub fn read_track<R: Read + Seek>(
         });
     }
 
-    // Safe: length validated against MAX_TEMPORAL_TRACK_BYTES (16 GiB) on line 247
-    // and HEADER_SIZE is constant, so result fits in usize
-    let mut body = vec![0u8; (length - HEADER_SIZE as u64) as usize];
-    reader.read_exact(&mut body)?;
-
+    // Stream records one at a time rather than slurping the whole body into a
+    // single `Vec<u8>`. A hostile but self-consistent header with
+    // `length ≈ MAX_TEMPORAL_TRACK_BYTES` (and matching counts) would
+    // otherwise force a ~16 GiB body allocation before any payload byte is
+    // validated; here, both the hasher and the decoded vectors grow only as
+    // `read_exact` succeeds.
     let mut header_for_hash = header;
     header_for_hash[CHECKSUM_OFFSET..CHECKSUM_OFFSET + 32].fill(0);
     let mut hasher = Hasher::new();
     hasher.update(&header_for_hash);
-    hasher.update(&body);
+
+    // Safe: counts validated by checked_mul and total_expected == length check
+    // above. The eager Vec capacity is clamped to bound up-front allocation;
+    // the vector grows as records are decoded. The result of the `min` always
+    // fits in usize because INITIAL_RECORDS_CAPACITY is a usize literal.
+    #[allow(clippy::cast_possible_truncation)]
+    let mentions_initial = entry_count.min(INITIAL_RECORDS_CAPACITY as u64) as usize;
+    #[allow(clippy::cast_possible_truncation)]
+    let anchors_initial = anchor_count.min(INITIAL_RECORDS_CAPACITY as u64) as usize;
+    let mut mentions = Vec::with_capacity(mentions_initial);
+    let mut anchors = Vec::with_capacity(anchors_initial);
+
+    let mut mention_buf = [0u8; MENTION_RECORD_SIZE];
+    for _ in 0..entry_count {
+        reader.read_exact(&mut mention_buf)?;
+        hasher.update(&mention_buf);
+        let raw = RawMention::decode(&mention_buf)?;
+        mentions.push(raw.into_high_level()?);
+    }
+
+    let mut anchor_buf = [0u8; ANCHOR_RECORD_SIZE];
+    for _ in 0..anchor_count {
+        reader.read_exact(&mut anchor_buf)?;
+        hasher.update(&anchor_buf);
+        let raw = RawAnchor::decode(&anchor_buf)?;
+        anchors.push(raw.into_high_level()?);
+    }
+
     let computed = *hasher.finalize().as_bytes();
     if computed != checksum {
         return Err(MemvidError::InvalidTemporalTrack {
             reason: "checksum mismatch".into(),
         });
-    }
-
-    // Safe: counts validated by checked_mul and total_expected == length check above
-    let mut mentions = Vec::with_capacity(entry_count as usize);
-    let mut anchors = Vec::with_capacity(anchor_count as usize);
-
-    // Safe: validated by checked_mul overflow check on line 283
-    let mentions_bytes = expected_entries_bytes as usize;
-    for chunk in body[..mentions_bytes].chunks_exact(MENTION_RECORD_SIZE) {
-        let raw = RawMention::decode(chunk)?;
-        mentions.push(raw.into_high_level()?);
-    }
-
-    for chunk in body[mentions_bytes..].chunks_exact(ANCHOR_RECORD_SIZE) {
-        let raw = RawAnchor::decode(chunk)?;
-        anchors.push(raw.into_high_level()?);
     }
 
     validate_mentions_sorted(&mentions)?;
@@ -552,5 +570,60 @@ mod tests {
             validate_anchors_sorted(&anchors),
             Err(MemvidError::InvalidTemporalTrack { .. })
         ));
+    }
+
+    #[test]
+    fn read_rejects_oversized_declared_length() {
+        // Anything strictly above the safety ceiling must be rejected before
+        // a body buffer is allocated.
+        let mut buf = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut buf);
+        let err = read_track(&mut cursor, 0, MAX_TEMPORAL_TRACK_BYTES + 1)
+            .expect_err("oversized declared length must be rejected");
+        match err {
+            MemvidError::InvalidTemporalTrack { reason } => {
+                assert!(reason.contains("length"), "unexpected reason: {reason}");
+            }
+            other => panic!("expected InvalidTemporalTrack, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn read_at_cap_does_not_eagerly_allocate_count_proportional_memory() {
+        // Construct a header whose declared length sits just under
+        // MAX_TEMPORAL_TRACK_BYTES with matching counts. This is the largest
+        // value that passes the ceiling check and the count consistency check,
+        // and is the case that previously allocated ~16 GiB body buffer plus
+        // count-proportional Vec capacity before any record was decoded.
+        //
+        // With streaming reads + clamped Vec capacity, the function must fail
+        // fast at the first body `read_exact` because only the header bytes
+        // are present.
+        let total_body = MAX_TEMPORAL_TRACK_BYTES - HEADER_SIZE as u64;
+        let entry_count = total_body / MENTION_RECORD_SIZE as u64;
+        let anchor_count = 0u64;
+        let declared_length = HEADER_SIZE as u64 + entry_count * MENTION_RECORD_SIZE as u64;
+        assert!(declared_length <= MAX_TEMPORAL_TRACK_BYTES);
+
+        let flags: u16 = 0;
+        let mut header = [0u8; HEADER_SIZE];
+        header[0..4].copy_from_slice(&TEMPORAL_TRACK_MAGIC);
+        header[4..6].copy_from_slice(&TEMPORAL_TRACK_VERSION.to_le_bytes());
+        header[6..8].copy_from_slice(&flags.to_le_bytes());
+        header[8..16].copy_from_slice(&entry_count.to_le_bytes());
+        header[16..24].copy_from_slice(&anchor_count.to_le_bytes());
+        // checksum bytes stay zero — the loop won't reach the checksum check
+        // because the first body read_exact will fail first.
+
+        let mut cursor = std::io::Cursor::new(header.to_vec());
+        let err = read_track(&mut cursor, 0, declared_length)
+            .expect_err("near-cap aligned length must fail at body read, not succeed");
+        assert!(
+            matches!(
+                &err,
+                MemvidError::Io { source, .. } if source.kind() == std::io::ErrorKind::UnexpectedEof
+            ),
+            "expected UnexpectedEof, got {err:?}",
+        );
     }
 }
