@@ -74,6 +74,26 @@ pub struct SearchRequest {
     pub acl_enforcement_mode: AclEnforcementMode,
 }
 
+impl Default for SearchRequest {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            top_k: 10,
+            snippet_chars: 200,
+            uri: None,
+            scope: None,
+            cursor: None,
+            #[cfg(feature = "temporal_track")]
+            temporal: None,
+            as_of_frame: None,
+            as_of_ts: None,
+            no_sketch: false,
+            acl_context: None,
+            acl_enforcement_mode: AclEnforcementMode::default(),
+        }
+    }
+}
+
 /// A single ranked hit with snippet metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchHit {
