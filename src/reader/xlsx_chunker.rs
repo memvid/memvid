@@ -327,7 +327,7 @@ mod tests {
 
     fn make_grid(data: Vec<Vec<CellValue>>, sheet_name: &str) -> SheetGrid {
         let num_rows = data.len() as u32;
-        let num_cols = data.iter().map(|r| r.len()).max().unwrap_or(0) as u32;
+        let num_cols = data.iter().map(Vec::len).max().unwrap_or(0) as u32;
         SheetGrid {
             sheet_name: sheet_name.to_string(),
             rows: data,
