@@ -379,11 +379,12 @@ impl Memvid {
             })?;
         let preview = self.frame_preview(&frame)?;
         let content = self.frame_content(&frame)?;
+        let lowered = content.to_lowercase();
         let count = query
             .split_whitespace()
             .filter(|token| !token.is_empty())
             .map(str::to_lowercase)
-            .map(|needle| content.to_lowercase().matches(&needle).count())
+            .map(|needle| lowered.matches(&needle).count())
             .sum();
         Ok((preview, count))
     }

@@ -36,9 +36,9 @@ regex = "1.11.1"
 time = { version = "0.3.36", features = ["formatting", "parsing"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 interim = { version = "0.2.1", optional = true }
-lopdf = "0.39"
+lopdf = "0.42"
 # Pure Rust PDF text extraction - used as primary extractor when extractous is disabled
-pdf-extract = { version = "0.10", optional = true }
+pdf-extract = { version = "0.12", optional = true }
 # High-accuracy PDF text extraction with perfect word spacing (2025)
 pdf_oxide = { version = "0.3", optional = true }
 unicode-normalization = "0.1"
