@@ -21,7 +21,7 @@ uuid = { version = "1.10.0", features = ["v4", "serde"] }
 log = "0.4.22"
 thiserror = "2.0.17"
 fs2 = "0.4.3"
-zstd = "0.13.1"
+zstd = "0.14.3"
 lz4_flex = "0.12.0"
 tracing = "0.1.41"
 serde_json = "1.0.145"
