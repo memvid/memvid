@@ -286,7 +286,10 @@ fn collect_sheet_filenames(archive: &mut ZipArchive<Cursor<&[u8]>>) -> Vec<(Stri
     // Match sheet names to worksheet files
     for i in 0..archive.len() {
         if let Ok(file) = archive.by_index(i) {
-            let name = file.name().to_string();
+            // zip 8+ returns the decoded (UTF-8, else CP437) name as a Result.
+            let Ok(name) = file.name().map(std::borrow::Cow::into_owned) else {
+                continue;
+            };
             if name.starts_with("xl/worksheets/sheet") && name.ends_with(".xml") {
                 // Extract sheet number from filename (e.g., "sheet1.xml" -> 0)
                 let num_str = name
