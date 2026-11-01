@@ -138,14 +138,18 @@ fn search_quoted_phrase_requires_exact_match() {
 
         for (uri, content) in [
             ("mv2://exact", "quantum mechanics is weird"),
-            ("mv2://separate", "quantum effects differ from classical mechanics"),
+            (
+                "mv2://separate",
+                "quantum effects differ from classical mechanics",
+            ),
         ] {
             let opts = PutOptions {
                 uri: Some(uri.to_string()),
                 search_text: Some(content.to_string()),
                 ..Default::default()
             };
-            mem.put_bytes_with_options(content.as_bytes(), opts).unwrap();
+            mem.put_bytes_with_options(content.as_bytes(), opts)
+                .unwrap();
         }
         mem.commit().unwrap();
     }
