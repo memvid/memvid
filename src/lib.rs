@@ -1,4 +1,7 @@
 #![deny(clippy::all, clippy::pedantic)]
+// With rust-version 1.88 clippy suggests let-chains for every nested `if` / `if let` (125 places). Style only,
+// and rewriting them would touch most of the crate, so it is left to a separate change.
+#![allow(clippy::collapsible_if)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![cfg_attr(
     test,

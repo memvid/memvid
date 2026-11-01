@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use calamine::{DataType, Reader as CalamineReader, Xlsx};
+use calamine::{Data, Reader as CalamineReader, Xlsx};
 
 use super::xlsx_chunker::{XlsxChunkingOptions, chunk_workbook, generate_flat_text};
 use super::xlsx_ooxml::{OoxmlMetadata, parse_ooxml_metadata};
@@ -44,7 +44,7 @@ impl XlsxReader {
         let mut grids = Vec::new();
 
         for sheet_name in &sheet_names {
-            let Some(Ok(range)) = workbook.worksheet_range(sheet_name) else {
+            let Ok(range) = workbook.worksheet_range(sheet_name) else {
                 continue;
             };
 
@@ -58,16 +58,15 @@ impl XlsxReader {
                 let cells: Vec<CellValue> = row
                     .iter()
                     .map(|cell| match cell {
-                        DataType::String(s) => CellValue::Text(s.clone()),
-                        DataType::Float(v) => CellValue::Number(*v),
-                        DataType::Int(v) => CellValue::Integer(*v),
-                        DataType::Bool(b) => CellValue::Boolean(*b),
-                        DataType::DateTime(v) => CellValue::Number(*v),
-                        DataType::DateTimeIso(s) => CellValue::DateTime(s.clone()),
-                        DataType::Duration(v) => CellValue::Number(*v),
-                        DataType::DurationIso(s) => CellValue::Text(s.clone()),
-                        DataType::Error(e) => CellValue::Error(format!("#{e:?}")),
-                        DataType::Empty => CellValue::Empty,
+                        Data::String(s) => CellValue::Text(s.clone()),
+                        Data::Float(v) => CellValue::Number(*v),
+                        Data::Int(v) => CellValue::Integer(*v),
+                        Data::Bool(b) => CellValue::Boolean(*b),
+                        Data::DateTime(v) => CellValue::Number(v.as_f64()),
+                        Data::DateTimeIso(s) => CellValue::DateTime(s.clone()),
+                        Data::DurationIso(s) => CellValue::Text(s.clone()),
+                        Data::Error(e) => CellValue::Error(format!("#{e:?}")),
+                        Data::Empty => CellValue::Empty,
                     })
                     .collect();
                 grid.rows.push(cells);
@@ -141,7 +140,7 @@ impl XlsxReader {
 
         let mut out = String::new();
         for sheet_name in workbook.sheet_names().clone() {
-            if let Some(Ok(range)) = workbook.worksheet_range(&sheet_name) {
+            if let Ok(range) = workbook.worksheet_range(&sheet_name) {
                 if !out.is_empty() {
                     out.push('\n');
                 }
@@ -154,16 +153,15 @@ impl XlsxReader {
                         }
                         first_cell = false;
                         match cell {
-                            DataType::String(s) => out.push_str(s.trim()),
-                            DataType::Float(v) => out.push_str(&format!("{v}")),
-                            DataType::Int(v) => out.push_str(&format!("{v}")),
-                            DataType::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-                            DataType::Error(e) => out.push_str(&format!("#{e:?}")),
-                            DataType::Empty => {}
-                            DataType::DateTime(v) => out.push_str(&format!("{v}")),
-                            DataType::DateTimeIso(s) => out.push_str(s),
-                            DataType::Duration(v) => out.push_str(&format!("{v}")),
-                            DataType::DurationIso(s) => out.push_str(s),
+                            Data::String(s) => out.push_str(s.trim()),
+                            Data::Float(v) => out.push_str(&format!("{v}")),
+                            Data::Int(v) => out.push_str(&format!("{v}")),
+                            Data::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+                            Data::Error(e) => out.push_str(&format!("#{e:?}")),
+                            Data::Empty => {}
+                            Data::DateTime(v) => out.push_str(&format!("{v}")),
+                            Data::DateTimeIso(s) => out.push_str(s),
+                            Data::DurationIso(s) => out.push_str(s),
                         }
                     }
                     out.push('\n');

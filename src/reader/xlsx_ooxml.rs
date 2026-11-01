@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use quick_xml::Reader as XmlReader;
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
@@ -309,7 +310,7 @@ fn collect_sheet_filenames(archive: &mut ZipArchive<Cursor<&[u8]>>) -> Vec<(Stri
 /// Parse workbook.xml to extract sheet display names in order.
 fn parse_workbook_sheet_names(xml: &str) -> Vec<String> {
     let mut reader = XmlReader::from_str(xml);
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
     let mut names = Vec::new();
     let mut buf = Vec::new();
     let mut in_sheets = false;
@@ -324,7 +325,9 @@ fn parse_workbook_sheet_names(xml: &str) -> Vec<String> {
             {
                 for attr in e.attributes().flatten() {
                     if attr.key.as_ref() == b"name" {
-                        if let Ok(val) = attr.decode_and_unescape_value(&reader) {
+                        if let Ok(val) = attr
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        {
                             names.push(val.to_string());
                         }
                     }
@@ -346,7 +349,7 @@ fn parse_workbook_sheet_names(xml: &str) -> Vec<String> {
 /// Parse styles.xml to extract numFmt definitions and cellXfs mappings.
 fn parse_styles_xml(xml: &str, metadata: &mut OoxmlMetadata) {
     let mut reader = XmlReader::from_str(xml);
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     let mut in_num_fmts = false;
     let mut in_cell_xfs = false;
@@ -364,12 +367,18 @@ fn parse_styles_xml(xml: &str, metadata: &mut OoxmlMetadata) {
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"numFmtId" => {
-                                    if let Ok(v) = attr.decode_and_unescape_value(&reader) {
+                                    if let Ok(v) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    ) {
                                         fmt_id = v.parse::<u32>().ok();
                                     }
                                 }
                                 b"formatCode" => {
-                                    if let Ok(v) = attr.decode_and_unescape_value(&reader) {
+                                    if let Ok(v) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    ) {
                                         fmt_code = Some(v.to_string());
                                     }
                                 }
@@ -384,7 +393,10 @@ fn parse_styles_xml(xml: &str, metadata: &mut OoxmlMetadata) {
                         let mut num_fmt_id = 0u32;
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"numFmtId" {
-                                if let Ok(v) = attr.decode_and_unescape_value(&reader) {
+                                if let Ok(v) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
                                     num_fmt_id = v.parse::<u32>().unwrap_or(0);
                                 }
                             }
@@ -410,7 +422,7 @@ fn parse_styles_xml(xml: &str, metadata: &mut OoxmlMetadata) {
 /// Parse a worksheet XML for `<mergeCells>` regions.
 fn parse_merge_cells_xml(xml: &str) -> Vec<MergedRegion> {
     let mut reader = XmlReader::from_str(xml);
-    reader.trim_text(true);
+    reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     let mut regions = Vec::new();
     let mut in_merge_cells = false;
@@ -425,7 +437,9 @@ fn parse_merge_cells_xml(xml: &str) -> Vec<MergedRegion> {
             {
                 for attr in e.attributes().flatten() {
                     if attr.key.as_ref() == b"ref" {
-                        if let Ok(val) = attr.decode_and_unescape_value(&reader) {
+                        if let Ok(val) = attr
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        {
                             if let Some(((tr, lc), (br, rc))) = parse_range_ref(&val) {
                                 regions.push(MergedRegion {
                                     top_row: tr,

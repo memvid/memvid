@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Memvid! We welcome contributions 
 
 ### Prerequisites
 
-- **Rust 1.85.0+** — Install from [rustup.rs](https://rustup.rs)
+- **Rust 1.88.0+** — Install from [rustup.rs](https://rustup.rs)
 - **Git** — For version control
 
 ### Setup

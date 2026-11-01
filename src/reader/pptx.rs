@@ -107,35 +107,72 @@ impl DocumentReader for PptxReader {
 
 fn extract_plain_text(xml: &str, block_suffix: &[u8]) -> String {
     let mut reader = XmlReader::from_str(xml);
-    reader.trim_text(true);
     let mut buf = Vec::new();
     let mut text = String::new();
     let mut first_block = true;
+    // quick-xml splits a text node at every entity reference (`&amp;`, `&#233;`),
+    // so the pieces are collected here and flushed as one node.
+    let mut node = String::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                if e.name().as_ref().ends_with(block_suffix) {
-                    if !first_block {
-                        text.push('\n');
-                    }
-                    first_block = false;
-                }
-            }
             Ok(Event::Text(t)) => {
-                if let Ok(content) = t.unescape() {
-                    if !content.trim().is_empty() {
-                        text.push_str(content.trim());
-                        text.push(' ');
-                    }
+                if let Ok(content) = t.decode() {
+                    node.push_str(&content);
                 }
             }
-            Ok(Event::Eof) => break,
-            Err(_) => break,
-            _ => (),
+            Ok(Event::GeneralRef(r)) => push_entity(&mut node, &r),
+            event => {
+                flush_node(&mut node, &mut text);
+                match event {
+                    Ok(Event::Start(e)) => {
+                        if e.name().as_ref().ends_with(block_suffix) {
+                            if !first_block {
+                                text.push('\n');
+                            }
+                            first_block = false;
+                        }
+                    }
+                    Ok(Event::Eof) | Err(_) => break,
+                    _ => (),
+                }
+            }
         }
         buf.clear();
     }
 
     text.trim().to_string()
+}
+
+fn push_entity(node: &mut String, r: &quick_xml::events::BytesRef<'_>) {
+    if let Ok(Some(ch)) = r.resolve_char_ref() {
+        node.push(ch);
+    } else if let Ok(name) = r.decode()
+        && let Some(value) = quick_xml::escape::resolve_predefined_entity(&name)
+    {
+        node.push_str(value);
+    }
+}
+
+fn flush_node(node: &mut String, text: &mut String) {
+    let content = node.trim();
+    if !content.is_empty() {
+        text.push_str(content);
+        text.push(' ');
+    }
+    node.clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keeps_entity_references_inside_text() {
+        let xml = r"<p:sld><a:p><a:r><a:t>R&amp;D</a:t></a:r></a:p><a:p><a:r><a:t>&#x2192; next</a:t></a:r></a:p></p:sld>";
+
+        let text = extract_plain_text(xml, b"p");
+
+        assert_eq!(text, "R&D \n→ next");
+    }
 }

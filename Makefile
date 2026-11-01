@@ -5,7 +5,7 @@
 
 # Variables
 CARGO := cargo
-RUST_VERSION := 1.85.0
+RUST_VERSION := 1.88.0
 FEATURES := lex,pdf_extract
 
 # Colors for output
