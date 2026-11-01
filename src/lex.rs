@@ -153,7 +153,7 @@ impl LexIndex {
 
     #[must_use]
     pub fn search(&self, query: &str, limit: usize) -> Vec<LexSearchHit> {
-        let mut query_tokens = tokenize(query);
+        let mut query_tokens = parse_query_terms(query);
         query_tokens.retain(|token| !token.is_empty());
         if query_tokens.is_empty() {
             return Vec::new();
@@ -424,6 +424,18 @@ fn tokenize(input: &str) -> Vec<String> {
             }
         })
         .collect()
+}
+
+fn parse_query_terms(input: &str) -> Vec<String> {
+    let trimmed = input.trim();
+    if trimmed.len() >= 2 && trimmed.starts_with('"') && trimmed.ends_with('"') {
+        let phrase = trimmed.trim_matches('"').trim().to_ascii_lowercase();
+        if !phrase.is_empty() {
+            return vec![phrase];
+        }
+    }
+
+    tokenize(input)
 }
 
 fn is_token_char(ch: char) -> bool {
